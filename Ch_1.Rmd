@@ -1,0 +1,112 @@
+---
+title: "Ch.1"
+author: "Amy Fox"
+date: "1/27/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Want to see the proability that 3 mutations would occur in an HIV strain based on a Poisson(5) model
+```{r}
+dpois(x = 3, lambda = 5)
+```
+
+The probability of seeing 3 mutations is `r dpois(x = 3, lambda = 5)` 
+
+Now if we want to see the probability of seeing 0:12 mutations we could do
+
+```{r}
+dpois(x = 0:12, lambda = 5)
+barplot(dpois(0:12, 5), names.arg = 0:12, col = "red")
+```
+Based on the barplot we can see that we will often see 4-5 mutations
+
+
+Dealing with factors:
+```{r}
+genotype = c("AA","AO","BB","AO","OO","AO","AA","BO","BO",
+             "AO","BB","AO","BO","AB","OO","AB","BB","AO","AO")
+
+table(genotype)
+
+# convert to factors
+genotypeF = factor(genotype)
+levels(genotypeF)
+table(genotypeF)
+```
+
+15 coin tosses with an equal coin (0.5 probability) where in size, we say that we're only going to toss 2 coins
+```{r}
+rbinom(15, prob = 0.5, size = 1)
+```
+
+If we want to say that the probability of a ball falling into a blue box is 2/3 and a red box 1/3
+```{r}
+rbinom(15, 2/3, size = 1)
+```
+
+In this case, a 1 indicates the the ball fell into the blue box.
+
+If we want to see how many times the ball falls into the blue box we could do
+```{r}
+set.seed(202)
+rbinom(1, prob = 2/3, size = 12)
+```
+
+10 balls would fall into the blue box out of 12 throws
+
+Probability mass distribution
+```{r}
+probabilities = dbinom(0:15, prob = 0.3, size = 15)
+round(probabilities, 2)
+barplot(probabilities, names.arg = 0:15, col = "red")
+```
+
+Probability can be approximated with Poisson distribution with the number of trials in large and the success of p is small.
+
+Test the probabilty of :
+```{r}
+rbinom(n = 1, prob = 5*10^-4, size = 10000)
+
+sim <- rbinom(n = 3000, prob = 5*10^-4, size = 10000)
+barplot(table(sim),  col = "light blue")
+```
+
+**Not sure if I did this task correctly**
+
+Find the sum of 50 independent Bernoulli variables with p = 0.01 
+
+Is this the same as poisson 0.5 random variable
+```{r}
+rbinom(n = 1, prob = 0.01, size = 50)
+
+# poisson = n*p
+dpois(x = 50, lambda = 0.5)
+```
+
+What is the probability that 7 or more epitopes would be found when the Poisson probability is 0.5
+
+P(X>=7) --> P(X<6)
+```{r}
+# can calculate this way 
+1-ppois(6, 0.5)
+
+# or this way
+ppois(6, 0.5, lower.tail = FALSE)
+```
+
+
+Monte Carlo
+
+100,000 instances of picking the maximum of 100 Poisson distributions
+```{r}
+maxes = replicate(100000, {
+  max(rpois(100, 0.5))
+})
+
+table(maxes)
+```
+
