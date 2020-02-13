@@ -5,6 +5,19 @@ date: "1/27/2020"
 output: html_document
 ---
 
+All notes are from the book Modern Statistics for Modern Biology
+
+http://web.stanford.edu/class/bios221/book/Chap-Generative.html
+
+
+Additional notes: always set the seed
+
+If p is small, then Poisson is better 
+
+The beauty of this simulation is that you can see the probability of seeing a false positive in your own research before you even take the data - you just need to know the sample size, false positive rate, and number of observations 
+
+You could also bootstrap with your current data to calculate if your data could actually be due to random noise
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -37,6 +50,12 @@ genotypeF = factor(genotype)
 levels(genotypeF)
 table(genotypeF)
 ```
+
+```{r}
+pvec = c(1/8, 3/8, 3/8, 1/8)
+rmultinom(4, prob = pvec, size = 1)
+```
+
 
 15 coin tosses with an equal coin (0.5 probability) where in size, we say that we're only going to toss 2 coins
 ```{r}
@@ -80,11 +99,27 @@ barplot(table(sim),  col = "light blue")
 Find the sum of 50 independent Bernoulli variables with p = 0.01 
 
 Is this the same as poisson 0.5 random variable
-```{r}
-rbinom(n = 1, prob = 0.01, size = 50)
 
-# poisson = n*p
-dpois(x = 50, lambda = 0.5)
+Bernoulli = 1 shot (with probabilty p)
+The summation of the bournouli's = binomial 
+
+Do 1000 simulations to compare the distributions
+```{r}
+set.seed(100)
+n = 50
+p = 0.01
+sims = 100000
+
+x <- rbinom(n = sims, prob = p, size = n) # binomial 
+
+# multiply Poisson by simulation so that the binomial is in the same y-axis
+hist(x)
+points(0:6, dpois(0:6, n*p)*sims, col = "red")
+lines(0:6, dpois(0:6, n*p)*sims, col = "red")
+
+
+# Therefore, I may not want to use this approximation
+# TO fix this, we could make p bigger or n smaller 
 ```
 
 What is the probability that 7 or more epitopes would be found when the Poisson probability is 0.5
@@ -108,5 +143,78 @@ maxes = replicate(100000, {
 })
 
 table(maxes)
+```
+
+Exercise 1.8
+```{r}
+
+```
+
+You can kind of make up statistical equations to simulate - for example, could just do summation of absoluate value of expected - observed.
+```{r}
+library(BSgenome.Celegans.UCSC.ce2)
+
+library(Biostrings)
+
+genome_length <- length(Celegans$chrM)
+
+# probabilities
+probs <- letterFrequency(Celegans$chrM, letters = c("A", "C", "G", "T"))/length(Celegans$chrM)
+
+set.seed(2)
+pvec <- rep(1/4, 4)
+obs <- rmultinom(1000, prob = pvec, size = genome_length)
+
+expected0 <- pvec*genome_length
+
+    
+stat = function(obsvd, exptd = genome_length * pvec) {
+  sum((obsvd - exptd)^2 / exptd)
+}
+stat(obs[, 1])
+
+
+S0 = apply(obs, 2, stat)
+summary(S0)
+
+
+hist(S0, breaks = 25, col = "lavender", main = "")
+
+# this gives us the test statistic
+q95 = quantile(S0, probs = 0.95)
+q95
+
+# if we set an alpha of 0.05, then 95% of the data should be 
+
+# Because our stat = 4392 (below) is much greater than our quantile of 8.045, then we reject the null (the probability is not uniform)
+
+# to get the 95% quantile where 3 is 1 fewer the number of bins you have
+qchisq(0.95, 3)
+```
+
+Don't need this
+```{r}
+
+obs <- rmultinom(1000, prob = probs, size = genome_length)
+
+expected0 <- pvec*genome_length
+
+    
+stat = function(obsvd, exptd = genome_length * pvec) {
+  sum((obsvd - exptd)^2 / exptd)
+}
+# this gives us the observed values
+stat(obs[, 1])
+
+
+S0 = apply(obs, 2, stat)
+summary(S0)
+
+hist(S0, breaks = 25, col = "lavender", main = "")
+
+q95 = quantile(S0, probs = 0.95)
+q95
+
+
 ```
 
