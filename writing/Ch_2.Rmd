@@ -1,0 +1,62 @@
+---
+title: "Ch_2"
+author: "Amy Fox"
+date: "2/13/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Mixture Models
+
+P(X | theta) = theta^x * e^-theta / x!
+
+where x is the data and theta is the parameter
+
+If I don't know what theta is, then I want find the value of theta that increases the probability to the highest amount
+
+
+Poisson is often count data becuase it include non-negative data
+```{r}
+load("../data/e100.RData")
+e99 = e100[-which.max(e100)]
+
+barplot(table(e99), space = 0.8, col = "chartreuse4")
+
+
+library("vcd")
+gf1 = goodfit( e99, "poisson")
+rootogram(gf1, xlab = "", rect_gp = gpar(fill = "chartreuse4"))
+```
+
+2.5.2
+```{r}
+library("Biostrings")
+staph = readDNAStringSet("../data/staphsequence.ffn.txt", "fasta")
+
+letterFrq = vapply(staph, letterFrequency, FUN.VALUE = numeric(4),
+         letters = "ACGT", OR = 0)
+colnames(letterFrq) = paste0("gene", seq(along = staph))
+tab10 = letterFrq[, 1:10]
+computeProportions = function(x) { x/sum(x) }
+prop10 = apply(tab10, 2, computeProportions)
+round(prop10, digits = 2)
+
+
+p0 = rowMeans(prop10)
+p0
+```
+
+The distrubtino of the nucleotide is not equal amongst genes. - Fig. 2.7  shows that the red is way outside the actual distribution (there is too much variability between genes)
+
+
+2.6
+Could jsut compared our observed to a Chi-squred because we know that our data is chi-squared
+
+Chi takes on only  positive values with higher humper near 0
+
+
+10 genes * 4 nucelotides - 1 (becuase when you know what 3 of the nucleotide frequencies the other one is 1-p)

@@ -2,7 +2,7 @@
 title: "Ch.1"
 author: "Amy Fox"
 date: "1/27/2020"
-output: html_document
+output: word_document
 ---
 
 All notes are from the book Modern Statistics for Modern Biology
