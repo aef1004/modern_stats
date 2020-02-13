@@ -1,0 +1,38 @@
+---
+title: "Ch_4"
+author: "Amy Fox"
+date: "2/13/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Finite Mixtures
+
+mixtuer model with 2 equal-sized components = flip a fair coin
+
+```{r}
+coinflips = (runif(10000) > 0.5)
+table(coinflips)
+
+oneFlip = function(fl, mean1 = 1, mean2 = 3, sd1 = 0.5, sd2 = 0.5) {
+  if(fl) {
+    rnorm(1, mean1, sd1)
+  } else {
+    rnorm(1, mean2, sd2)
+  }
+}
+
+fairmix = vapply(coinflips, oneFlip, numeric(1))
+
+library(ggplot2)
+library(dplyr)
+
+ggplot(tibble(value = fairmix), aes(x = value)) +
+  geom_histogram(fill = "blue", binwidth = 0.1)
+
+
+```
+
