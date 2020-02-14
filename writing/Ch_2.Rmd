@@ -39,6 +39,7 @@ staph = readDNAStringSet("../data/staphsequence.ffn.txt", "fasta")
 
 letterFrq = vapply(staph, letterFrequency, FUN.VALUE = numeric(4),
          letters = "ACGT", OR = 0)
+
 colnames(letterFrq) = paste0("gene", seq(along = staph))
 tab10 = letterFrq[, 1:10]
 computeProportions = function(x) { x/sum(x) }
@@ -53,10 +54,100 @@ p0
 The distrubtino of the nucleotide is not equal amongst genes. - Fig. 2.7  shows that the red is way outside the actual distribution (there is too much variability between genes)
 
 
-2.6
+# 2.6
+
 Could jsut compared our observed to a Chi-squred because we know that our data is chi-squared
 
 Chi takes on only  positive values with higher humper near 0
 
 
 10 genes * 4 nucelotides - 1 (becuase when you know what 3 of the nucleotide frequencies the other one is 1-p)
+
+```{r}
+load("../data/ChargaffTable.RData")
+ChargaffTable
+
+# if these are related, then the (pC - pG)^2 shoud be small
+statChf = function(x){
+  sum((x[, "C"] - x[, "G"])^2 + (x[, "A"] - x[, "T"])^2)
+}
+
+chfstat = statChf(ChargaffTable)
+
+permstat = replicate(100000, {
+     permuted = t(apply(ChargaffTable, 1, sample))
+     colnames(permuted) = colnames(ChargaffTable)
+     statChf(permuted)
+})
+
+pChf = mean(permstat <= chfstat)
+pChf
+```
+
+
+# Exercise 2.3
+
+```{r}
+mtb = read.table("../data/M_tuberculosis.txt", header = TRUE)
+head(mtb, n = 4)
+
+# proline occurs at this probability 
+pro  =  mtb[ mtb$AmAcid == "Pro", "Number"]
+pro/sum(pro)
+
+# a)
+# see that Arg, Leu, and Ser have a high number of codons at 6
+rowSums(table(mtb))
+
+
+# b)
+# PerThous could be for exmaple that there are 19.25 cases of GGG per 1000 nucleotides
+
+library(dplyr)
+
+mtb %>%
+  mutate(genome_length = sum(Number)) %>%
+  group_by(Codon) %>%
+  mutate(PerThous = 1000*Number / genome_length)
+
+# c)
+# Write an R function that you can apply to the table to find which of the amino acids shows the strongest codon bias, i.e., the strongest departure from uniform distribution among its possible spellings.
+mtb
+
+# see that Arg, Leu, and Ser have a high number of codons at 6
+codon_no <- rowSums(table(mtb))
+library(tidyverse)
+
+codon_df <- data.frame(codon_no) %>%
+  rownames_to_column() %>%
+  rename(`AmAcid` = rowname) %>%
+  mutate(prob_codon = 1/codon_no)
+
+real_data <- full_join(mtb, codon_df, by = "AmAcid") %>%
+  group_by(AmAcid) %>%
+  mutate(am_length = sum(Number)) %>%
+  mutate(real_prob = Number / am_length) %>%
+  select(-codon_no, -am_length) %>%
+  mutate(expected = Number*prob_codon)
+  
+
+
+
+# Something like this below???
+
+stat = function(obsvd, exptd = 20 * pvec) {
+   sum((obsvd - exptd)^2 / exptd)
+}
+
+B = 1000
+
+simulstat = replicate(B, {
+  randomtab10 = sapply(cs, function(s) { rmultinom(1, s, p0) })
+  stat(randomtab10, expectedtab10)
+})
+S1 = stat(tab10, expectedtab10)
+sum(simulstat >= S1)
+```
+
+*** # the number column is the observed, expected is the nubmer column times the prob_codon
+
