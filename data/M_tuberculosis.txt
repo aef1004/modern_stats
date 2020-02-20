@@ -1,0 +1,81 @@
+##Mycobacterium tuberculosis H37Rv [gbbct]: 3998 CDS's (1344223 codons)
+AmAcid  Codon   Number    PerThous     
+Gly     GGG     25874     19.25       
+Gly     GGA     13306      9.90       
+Gly     GGT     25320     18.84      
+Gly     GGC     68310     50.82       
+ 
+Glu     GAG     41103     30.58       
+Glu     GAA     21767     16.19       
+Asp     GAT     21165     15.75       
+Asp     GAC     56687     42.17       
+ 
+Val     GTG     53942     40.13       
+Val     GTA      6372      4.74       
+Val     GTT     10768      8.01       
+Val     GTC     43909     32.66       
+ 
+Ala     GCG     65402     48.65       
+Ala     GCA     17268     12.85       
+Ala     GCT     14661     10.91       
+Ala     GCC     80445     59.84       
+ 
+Arg     AGG      4286      3.19       
+Arg     AGA      1740      1.29       
+Ser     AGT      4764      3.54       
+Ser     AGC     19462     14.48       
+ 
+Lys     AAG     20298     15.10       
+Lys     AAA      7080      5.27       
+Asn     AAT      7109      5.29       
+Asn     AAC     26763     19.91       
+ 
+Met     ATG     24774     18.43       
+Ile     ATA      2952      2.20       
+Ile     ATT      8686      6.46       
+Ile     ATC     45551     33.89       
+ 
+Thr     ACG     21005     15.63       
+Thr     ACA      6107      4.54       
+Thr     ACT      4939      3.67       
+Thr     ACC     47294     35.18       
+ 
+Trp     TGG     19648     14.62       
+End     TGA      2182      1.62       
+Cys     TGT      2983      2.22       
+Cys     TGC      8915      6.63       
+ 
+End     TAG      1186      0.88       
+End     TAA       630      0.47       
+Tyr     TAT      8169      6.08       
+Tyr     TAC     19649     14.62       
+ 
+Leu     TTG     24107     17.93       
+Leu     TTA      2178      1.62       
+Phe     TTT      8293      6.17       
+Phe     TTC     31391     23.35       
+ 
+Ser     TCG     26030     19.36       
+Ser     TCA      4778      3.55       
+Ser     TCT      2984      2.22       
+Ser     TCC     15513     11.54       
+ 
+Arg     CGG     33090     24.62       
+Arg     CGA      9678      7.20       
+Arg     CGT     11358      8.45       
+Arg     CGC     38110     28.35       
+ 
+Gln     CAG     30606     22.77       
+Gln     CAA     10883      8.10       
+His     CAT      8633      6.42       
+His     CAC     21279     15.83       
+ 
+Leu     CTG     67810     50.45       
+Leu     CTA      6377      4.74       
+Leu     CTT      7315      5.44       
+Leu     CTC     23213     17.27       
+ 
+Pro     CCG     42424     31.56       
+Pro     CCA      8229      6.12       
+Pro     CCT      4578      3.41       
+Pro     CCC     22895     17.03       
