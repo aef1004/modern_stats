@@ -151,3 +151,68 @@ sum(simulstat >= S1)
 
 *** # the number column is the observed, expected is the nubmer column times the prob_codon
 
+
+
+
+# Chapter 2.9
+
+We want to estimate the proportion of a particular Y-haplotype that consists of a set of different short tandem repeats (STR).
+
+```{r}
+haplo6=read.table("../data/haplotype6.txt",header = TRUE)
+haplo6
+```
+
+We generate a random sample of 10000 θ's
+
+```{r}
+rtheta = rbeta(100000, 50, 350)
+y = vapply(rtheta, function(th) {
+  rbinom(1, prob = th, size = 300)
+}, numeric(1))
+hist(y, breaks = 50, col = "orange", main = "", xlab = "")
+
+
+# Question: does the following code give us the same result as above?
+z <- rbinom(length(rtheta), rtheta, size = 300)
+hist(z, breaks = 50, col = "orange", main = "", xlab = "")
+```
+
+Histogram of all the thetas such that Y=40: the posterior distribution
+**where is thetas defined??**
+```{r}
+thetaPostEmp = rtheta[ y == 40 ]
+hist(thetaPostEmp, breaks = 40, col = "chartreuse4", main = "",
+  probability = TRUE, xlab = expression("posterior"~theta))
+densPostTheory  =  dbeta(thetas, 90, 610)
+lines(thetas, densPostTheory, type="l", lwd = 3)
+```
+
+Use Monte Carlo integration instead of above
+```{r}
+thetaPostMC = rbeta(n = 1e6, 90, 610)
+mean(thetaPostMC)
+
+qqplot(thetaPostMC, thetaPostEmp, type = "l", asp = 1)
+abline(a = 0, b = 1, col = "blue")
+```
+
+# Chapter 2.10
+
+Explore some of the useful data and functions provided in the Biostrings package by exploring the tutorial vignette.
+```{r}
+library("Biostrings")
+library("BSgenome")
+ag = available.genomes()
+length(ag)
+ag[1:2]
+```
+
+Explore the occurrence of the AGGAGGT motif3333 This is the Shine-Dalgarno motif which helps initiate protein synthesis in bacteria. in the geonome of E.coli. We use the genome sequence of one particular strain, Escherichia coli str. K12 substr.DH10B3434 It is known as the laboratory workhorse, often used in experiments., whose NCBI accession number is NC_010473.
+```{r}
+library("BSgenome.Ecoli.NCBI.20080805")
+Ecoli
+shineDalgarno = "AGGAGGT"
+ecoli = Ecoli$NC_010473
+```
+
