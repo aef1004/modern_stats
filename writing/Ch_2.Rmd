@@ -182,6 +182,7 @@ Histogram of all the thetas such that Y=40: the posterior distribution
 **where is thetas defined??**
 ```{r}
 thetaPostEmp = rtheta[ y == 40 ]
+
 hist(thetaPostEmp, breaks = 40, col = "chartreuse4", main = "",
   probability = TRUE, xlab = expression("posterior"~theta))
 densPostTheory  =  dbeta(thetas, 90, 610)
@@ -216,3 +217,52 @@ shineDalgarno = "AGGAGGT"
 ecoli = Ecoli$NC_010473
 ```
 
+
+Bayesian often considered "subjective" method 
+Dicey working with Bayesian on drug trials 
+
+If you have 4 strains that are different 
+Have 2 strains that I know more about 
+
+Can go back and think 
+
+Don't have to use beta distrubtion for Bayesian - can use what ever is appropriate for what you think the data should look like
+
+You always want to plot your prior and your data and and make sure that the posterior is not directly on top of your prior because that means that your pior is affecting you posterior completely/too much 
+
+
+# Exercise 2.6
+Choose your own prior for the parameters of the beta distribution. You can do this by sketching it here: https://jhubiostatistics.shinyapps.io/drawyourprior. Once you have set up a prior, re-analyse the data from Section 2.9.2, where we saw 
+Y = 40 successes out of n = 300 trials. Compare your posterior distribution to the one we obtained in that section using a QQ-plot.
+
+```{r}
+set.seed(2)
+alpha = 2.47
+beta = 8.5
+
+rtheta = rbeta(1000000, alpha, beta)
+y = vapply(rtheta, function(th) {
+  rbinom(1, prob = th, size = 300)
+}, numeric(1))
+hist(y, breaks = 50, col = "orange", main = "", xlab = "")
+
+
+thetas = seq(0, 1, by = 0.001)
+
+thetaPostEmp = rtheta[ y == 40 ]
+hist(thetaPostEmp, breaks = 40, col = "chartreuse4", main = "",
+  probability = TRUE, xlab = expression("posterior"~theta), ylim = c(0,35))
+densPostTheory  =  dbeta(thetas, (alpha + 40), (beta + 300-40)) # what the heck is this
+lines(thetas, densPostTheory, type="l", lwd = 3)
+
+
+thetaPostMC = rbeta(n = 1e6, (alpha + 40), (beta + 300-40)) # this needs to be (alpha + 40) and (B + 300-40)
+mean(thetaPostMC)
+
+qqplot(thetaPostMC, thetaPostEmp, type = "l", asp = 1)
+abline(a = 0, b = 1, col = "blue")
+```
+
+Good agreement between the two 
+
+When theta (distribution of the probability)
