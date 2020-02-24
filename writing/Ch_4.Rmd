@@ -5,13 +5,17 @@ date: "2/13/2020"
 output: html_document
 ---
 
+Questions
+4.2 (right before 4.2.3) how do we actually use this for a biological question?
+4.3 (bootstrapping)  Then also is the bootstrap function the same as the replicate function? Do they do the same thing?
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Finite Mixtures
+# 4.2 Finite Mixtures
 
-mixtuer model with 2 equal-sized components = flip a fair coin
+Mixture model with 2 equal-sized components = flip a fair coin
 
 ```{r}
 coinflips = (runif(10000) > 0.5)
@@ -34,5 +38,99 @@ ggplot(tibble(value = fairmix), aes(x = value)) +
   geom_histogram(fill = "blue", binwidth = 0.1)
 
 
+# or you can do it an easier way with vectorization
+# try with 1 million coin flips
+
+means = c(1, 3)
+sds   = c(0.25, 0.25)
+values = rnorm(length(coinflips),
+          mean = ifelse(coinflips, means[1], means[2]),
+          sd   = ifelse(coinflips, sds[1],   sds[2]))
+
+
+fair = tibble(
+  coinflips = (runif(1e6) > 0.5),
+  values = rnorm(length(coinflips),
+               mean = ifelse(coinflips, means[1], means[2]),
+               sd   = ifelse(coinflips, sds[1],   sds[2])))
+ggplot(fair, aes(x = values)) +
+     geom_histogram(fill = "purple", bins = 500)
+
+
 ```
 
+If we have 2 unfair coins with probabilities of head as p1 = 0.125 and p2 = 0.25 --> we then pick 1 coin and toss the coin twice to record the number of heads (K)
+
+```{r}
+probHead = c(0.125, 0.25)
+for (pi in c(1/8, 1/4)) {
+  whCoin = sample(2, 100, replace = TRUE, prob = c(pi, 1-pi))
+  K = rbinom(length(whCoin), size = 2, prob = probHead[whCoin])
+  print(table(K))
+}
+```
+
+4.2.3 Zero inflated data
+
+Note that this code will not run because they did not include the source code - will need to go to the source code for the chapter to download it
+
+library(mosaicsExample)
+library(mosaics)
+
+
+bincts = print(binTFBS)
+ggplot(bincts, aes(x = tagCount)) +
+  geom_histogram(binwidth = 1, fill = "forestgreen")
+
+
+
+4.2.4 More than 2 components
+Weighing n = 7,000 nucleotides from mixtures of DNA 
+```{r}
+masses = c(A =  331, C =  307, G =  347, T =  322)
+probs  = c(A = 0.12, C = 0.38, G = 0.36, T = 0.14)
+N  = 7000
+sd = 3
+nuclt   = sample(length(probs), N, replace = TRUE, prob = probs)
+quadwts = rnorm(length(nuclt),
+                mean = masses[nuclt],
+                sd   = sd)
+ggplot(tibble(quadwts = quadwts), aes(x = quadwts)) +
+  geom_histogram(bins = 100, fill = "purple")
+```
+
+# 4.3 Empirical Distributions and Nonparametric Bootstrap
+
+Note that the ZeaMays data from the HistData package is the heights of 15 pairs of Zea Mays plants (self-hybridized vs crossed)
+```{r}
+library("HistData")
+ZeaMays$diff
+ggplot(ZeaMays, aes(x = diff, ymax = 1/15, ymin = 0)) +
+  geom_linerange(size = 1, col = "forestgreen") + ylim(0, 0.1)
+
+# Bootstrap the data to draw B = 1000 samples for size 15 from the 15 samples 
+
+B = 1000
+meds = replicate(B, {
+  i = sample(15, 15, replace = TRUE)
+  median(ZeaMays$diff[i])
+})
+ggplot(tibble(medians = meds), aes(x = medians)) +
+  geom_histogram(bins = 30, fill = "purple")
+
+# Compare the differences in bootstrapping with mean vs. median
+library("bootstrap")
+bootstrap(ZeaMays$diff, B, mean)
+bootstrap(ZeaMays$diff, B, median)
+
+# **Is this the same as what they were doing directly above with the replicate function?*
+
+# If the sample is composed of n=3 different values, how many different bootstrap resamples are possible? Answer the same question with n = 15
+
+# the way that you plug the numbers in is to do 2n-1 for the first value and n for the second
+
+c(N3 = choose(5, 3), N15 = choose(29, 15))
+```
+
+
+# 4.4 Infinite Mixtures
