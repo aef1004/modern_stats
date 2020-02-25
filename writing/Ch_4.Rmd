@@ -134,3 +134,12 @@ c(N3 = choose(5, 3), N15 = choose(29, 15))
 
 
 # 4.4 Infinite Mixtures
+
+Gamma-Poisson distribution
+```{r}
+lambda = rgamma(10000, shape = 10, rate = 3/2)
+gp = rpois(length(lambda), lambda = lambda)
+ggplot(tibble(x = gp), aes(x = x)) +
+  geom_histogram(bins = 100, fill= "purple")
+```
+
