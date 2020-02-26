@@ -141,5 +141,17 @@ lambda = rgamma(10000, shape = 10, rate = 3/2)
 gp = rpois(length(lambda), lambda = lambda)
 ggplot(tibble(x = gp), aes(x = x)) +
   geom_histogram(bins = 100, fill= "purple")
+
+
+# Poisson variables with rates lambdas
+lambdas = seq(100, 900, by = 100)
+simdat = lapply(lambdas, function(l)
+    tibble(y = rpois(n = 40, lambda=l), lambda = l)
+  ) %>% bind_rows
+library("ggbeeswarm")
+ggplot(simdat, aes(x = lambda, y = y)) +
+  geom_beeswarm(alpha = 0.6, color = "purple")
+ggplot(simdat, aes(x = lambda, y = sqrt(y))) +
+  geom_beeswarm(alpha = 0.6, color = "purple")
 ```
 
