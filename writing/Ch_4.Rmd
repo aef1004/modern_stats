@@ -5,9 +5,33 @@ date: "2/13/2020"
 output: html_document
 ---
 
-Questions
+**Questions**
 4.2 (right before 4.2.3) how do we actually use this for a biological question?
+
+ - maybe the data is composed of 3 different types - expose mice and some belief that some mice have some level of different - see if there are truly different groups - can compare testing different group numbers - 
+  - could also use if you lose the information for different grups 
+  
 4.3 (bootstrapping)  Then also is the bootstrap function the same as the replicate function? Do they do the same thing?
+
+  - yes this is the same thing
+  - non-parametric are really good to use (but you lose power because not assuming distribuiton)
+  
+  
+Jack knife is similar to bootstrap - you remove 1 datapoint and then recalcualte
+Then report the jack knife estimates - it shows how influlential each of the data points is 
+calculate beta hat 
+With all the birds the beta hat is ___ if I remove sinular birds, the range is 
+
+this function exists in the bootstrap package
+
+
+
+**Distributions**
+
+- normal
+- binomial - think of coin flip
+- poisson - count data (can include rare observations)
+- gamma - think waiting times - ex. time until a mouse dies, anything continuous that can't be negative
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -153,5 +177,99 @@ ggplot(simdat, aes(x = lambda, y = y)) +
   geom_beeswarm(alpha = 0.6, color = "purple")
 ggplot(simdat, aes(x = lambda, y = sqrt(y))) +
   geom_beeswarm(alpha = 0.6, color = "purple")
+```
+
+
+
+# Exercise 4.3
+
+Mixture modeling examples for regression. The flexmix package (Grün, Scharl, and Leisch 2012) enables us to cluster and fit regressions to the data at the same time. The standard M-step FLXMRglm of flexmix is an interface to R’s generalized linear modeling facilities (the glm function). Load the package and an example dataset.
+
+
+a) First, plot the data and try to guess how the points were generated.
+
+yn = normal
+yp = poisson
+yb = binomial
+```{r}
+library("flexmix")
+data("NPreg")
+
+NPreg
+library(ggplot2)
+ggplot(data = NPreg, aes(x = x, y = yn, color = class)) +
+  geom_point()
+
+ggplot(data = NPreg, aes(x = x, y = yb, color = class)) +
+  geom_point()
+
+ggplot(data = NPreg, aes(x = x, y = yp, color = class)) +
+  geom_point()
+```
+
+b) Fit a two component mixture model using the commands
+```{r}
+library(dplyr)
+set.seed(10)
+m1 = flexmix(yn ~ x + I(x^2), data = NPreg, k = 2) %>%
+  print()
+
+summary(m1)
+```
+
+c) Look at the estimated parameters of the mixture components and make a truth table that cross-classifies true classes versus cluster memberships. What does the summary of the object m1 show us?
+
+```{r}
+table(NPreg$class, clusters(m1))
+```
+
+Rows are the true clusters - the columns are the components that we added in
+We can see that 5% are misclustered. 
+
+d) Plot the data again, this time coloring each point according to its estimated class.
+
+```{r}
+ggplot(data = NPreg, aes(x = x, y = yn, color = class)) +
+  geom_point() +
+  ggtitle("Actual labels")
+
+ggplot(data = NPreg, aes(x = x, y = yn, color = clusters(m1))) +
+  geom_point() +
+  ggtitle("Guessed labels")
+
+
+```
+
+Try the same thing with the Poisson
+```{r}
+m2 = flexmix(yp ~ x, data = NPreg, model = FLXMRglm(family = "poisson"), k = 2) %>%
+  print()
+
+table(NPreg$class, clusters(m2))
+
+
+ggplot(data = NPreg, aes(x = x, y = yp, color = class)) +
+  geom_point() +
+  ggtitle("Actual labels")
+
+ggplot(data = NPreg, aes(x = x, y = yp, color = clusters(m2))) +
+  geom_point() +
+  ggtitle("Guessed labels")
+```
+
+Try with binomial
+```{r}
+m3 <- initFlexmix(cbind(yb,1 - yb) ~ x, data = NPreg, k = 2,
+                   model = FLXMRglm(family = "binomial"))
+
+table(NPreg$class, clusters(m3))
+
+ggplot(data = NPreg, aes(x = x, y = yb, color = class)) +
+  geom_point() +
+  ggtitle("Actual labels")
+
+ggplot(data = NPreg, aes(x = x, y = yb, color = clusters(m3))) +
+  geom_point() +
+  ggtitle("Guessed labels")
 ```
 
