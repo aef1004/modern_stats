@@ -229,15 +229,17 @@ We can see that 5% are misclustered.
 d) Plot the data again, this time coloring each point according to its estimated class.
 
 ```{r}
-ggplot(data = NPreg, aes(x = x, y = yn, color = class)) +
+
+library(gridExtra)
+g1<- ggplot(data = NPreg, aes(x = x, y = yn, color = class)) +
   geom_point() +
   ggtitle("Actual labels")
 
-ggplot(data = NPreg, aes(x = x, y = yn, color = clusters(m1))) +
+g2 <- ggplot(data = NPreg, aes(x = x, y = yn, color = clusters(m1))) +
   geom_point() +
   ggtitle("Guessed labels")
 
-
+grid.arrange(g1, g2)
 ```
 
 Try the same thing with the Poisson
@@ -248,13 +250,15 @@ m2 = flexmix(yp ~ x, data = NPreg, model = FLXMRglm(family = "poisson"), k = 2) 
 table(NPreg$class, clusters(m2))
 
 
-ggplot(data = NPreg, aes(x = x, y = yp, color = class)) +
+g3 <- ggplot(data = NPreg, aes(x = x, y = yp, color = class)) +
   geom_point() +
   ggtitle("Actual labels")
 
-ggplot(data = NPreg, aes(x = x, y = yp, color = clusters(m2))) +
+g4 <- ggplot(data = NPreg, aes(x = x, y = yp, color = clusters(m2))) +
   geom_point() +
   ggtitle("Guessed labels")
+
+grid.arrange(g3, g4)
 ```
 
 Try with binomial
@@ -264,12 +268,14 @@ m3 <- initFlexmix(cbind(yb,1 - yb) ~ x, data = NPreg, k = 2,
 
 table(NPreg$class, clusters(m3))
 
-ggplot(data = NPreg, aes(x = x, y = yb, color = class)) +
+g5 <- ggplot(data = NPreg, aes(x = x, y = yb, color = class)) +
   geom_point() +
   ggtitle("Actual labels")
 
-ggplot(data = NPreg, aes(x = x, y = yb, color = clusters(m3))) +
+g6 <- ggplot(data = NPreg, aes(x = x, y = yb, color = clusters(m3))) +
   geom_point() +
   ggtitle("Guessed labels")
+
+grid.arrange(g5, g6)
 ```
 
