@@ -1,0 +1,81 @@
+---
+title: "Ch_5"
+author: "Amy Fox"
+date: "3/4/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# 5.5.2 Data Preprocessing
+
+You can visualize flow data with the flowViz package
+```{r}
+library("flowCore") 
+library("flowViz") 
+fcsB = read.FCS("../data/Bendall_2011.fcs") 
+slotNames(fcsB)
+
+markersB = readr::read_csv("../data/Bendall_2011_markers.csv")
+mt = match(markersB$isotope, colnames(fcsB))
+stopifnot(!any(is.na(mt)))
+colnames(fcsB)[mt] = markersB$marker
+
+
+flowPlot(fcsB, plotParameters = colnames(fcsB)[2:3], logy = TRUE)
+```
+
+It's necessary to transform your flow data in order to see clusters of cells. Arcsinh is used because it can deal with negative numbers.
+```{r}
+
+asinhtrsf = arcsinhTransform(a = 0.1, b = 1)
+fcsBT = transform(fcsB,
+  transformList(colnames(fcsB)[-c(1, 2, 41)], asinhtrsf))
+densityplot( ~`CD3all`, fcsB)
+densityplot( ~`CD3all`, fcsBT)
+```
+
+Combine contour plot with the flow plot
+```{r}
+kf = kmeansFilter("CD3all" = c("Pop1","Pop2"), filterId="myKmFilter")
+fres = flowCore::filter(fcsBT, kf)
+summary(fres)
+
+fcsBT1 = flowCore::split(fcsBT, fres, population = "Pop1")
+fcsBT2 = flowCore::split(fcsBT, fres, population = "Pop2")
+
+flowPlot(fcsBT, plotParameters = c("CD3all", "CD56"), logy = FALSE)
+contour(fcsBT[, c(40, 19)], add = TRUE)
+```
+
+```{r}
+library("ggcyto")
+library("labeling")
+ggcd4cd8=ggcyto(fcsB,aes(x=CD4,y=CD8))
+ggcd4=ggcyto(fcsB,aes(x=CD4))
+ggcd8=ggcyto(fcsB,aes(x=CD8))
+p1=ggcd4+geom_histogram(bins=60)
+p1b=ggcd8+geom_histogram(bins=60)
+asinhT = arcsinhTransform(a=0,b=1)
+transl = transformList(colnames(fcsB)[-c(1,2,41)], asinhT)
+fcsBT = transform(fcsB, transl)
+p1t=ggcyto(fcsBT,aes(x=CD4))+geom_histogram(bins=90)
+p2t=ggcyto(fcsBT,aes(x=CD4,y=CD8))+geom_density2d(colour="black")
+p3t=ggcyto(fcsBT,aes(x=CD45RA,y=CD20))+geom_density2d(colour="black")
+
+```
+
+```{r}
+library("dbscan")
+mc5 = Biobase::exprs(fcsBT)[, c(15,16,19,40,33)]
+res5 = dbscan::dbscan(mc5, eps = 0.65, minPts = 30)
+mc5df = data.frame(mc5, cluster = as.factor(res5$cluster))
+table(mc5df$cluster)
+
+ggplot(mc5df, aes(x=CD4,    y=CD8,  col=cluster))+geom_density2d()
+ggplot(mc5df, aes(x=CD3all, y=CD20, col=cluster))+geom_density2d()
+```
+
