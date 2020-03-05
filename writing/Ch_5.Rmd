@@ -10,6 +10,14 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
+Binary distance
+Looking at strain 1 & 2
+Find the number of total genes that are "on" (so this would be there are 5 genes that are 1's) - there are 5 total different genes that are on in at least 1 strain
+
+There is 1 that is on for both of the strains, so we get the value as 1/5 --> to calculate the distance, we take 1-1/5 = 4/5 = 0.8
+
+A larger number means that their further apart in distance
+
 # 5.5.2 Data Preprocessing
 
 You can visualize flow data with the flowViz package
@@ -77,5 +85,101 @@ table(mc5df$cluster)
 
 ggplot(mc5df, aes(x=CD4,    y=CD8,  col=cluster))+geom_density2d()
 ggplot(mc5df, aes(x=CD3all, y=CD20, col=cluster))+geom_density2d()
+```
+
+
+
+# Exercise 5.1
+
+A) 
+```{r}
+library("cluster")
+library(dplyr)
+library(ggplot2)
+
+set.seed(23)
+
+# copied from section 5.7
+simdat = lapply(c(0, 8), function(mx) {
+  lapply(c(0,8), function(my) {
+    tibble(x = rnorm(100, mean = mx, sd = 2),
+           y = rnorm(100, mean = my, sd = 2),
+           class = paste(mx, my, sep = ":"))
+   }) %>% bind_rows
+}) %>% bind_rows
+
+
+simdatxy = simdat[, c("x", "y")] # without class label
+
+
+pam4 <- pam(simdatxy, 4)
+
+sil <- silhouette(pam4, 4)
+
+plot(sil, col = c("red", "green", "blue", "purple"), main = "Silhouette")
+
+summary(sil)$avg.width
+```
+
+Silhoutte index = 0.52
+
+
+B) 
+```{r}
+library(purrr)
+k <- c(2:10)
+
+df_test <- data.frame()
+
+for (i in 2:10){
+  
+  pam_run <- pam(simdatxy, i)
+  sil_run <- silhouette(pam_run, i)
+  
+  row_to_add <- data.frame(i, width = summary(sil_run)$avg.width)
+  
+  df_test <- rbind(df_test, row_to_add)
+}
+
+df_test
+
+ggplot(df_test, aes(i, width)) +
+  geom_point() +
+  geom_line() +
+  xlab("k") +
+  ylab("Silhouette Index") +
+  ggtitle("Testing different k values for Silhouette Index")
+
+
+summary(sil_run)
+```
+
+Because the Silhouette index is the highest at k = 4, then this should be the best silhouette index.
+
+C) 
+
+```{r}
+
+set.seed(23)
+# copied from section 5.7 but then changed the groups to 1 instead of 4 groups
+simdat_diff = lapply(c(1), function(mx) {
+  lapply(c(1), function(my) {
+    tibble(x = rnorm(100, mean = mx, sd = 2),
+           y = rnorm(100, mean = my, sd = 2),
+           class = paste(mx, my, sep = ":"))
+   }) %>% bind_rows
+}) %>% bind_rows
+
+
+simdatxy_adjust = simdat_diff[, c("x", "y")] # without class label
+
+ggplot(simdatxy_adjust, aes(x = x, y = y)) +
+  geom_point()
+
+pam4 <- pam(simdatxy_adjust, 4)
+
+sil <- silhouette(pam4, 4)
+
+plot(sil, col = c("red", "green", "blue", "purple"), main = "Silhouette")
 ```
 
