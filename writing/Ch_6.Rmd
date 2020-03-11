@@ -1,0 +1,85 @@
+---
+title: "Ch_6"
+author: "Amy Fox"
+date: "3/11/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 6.1
+```{r}
+set.seed(0xdada)
+numFlips = 100
+probHead = 0.6
+coinFlips = sample(c("H", "T"), size = numFlips,
+  replace = TRUE, prob = c(probHead, 1 - probHead))
+head(coinFlips)
+
+table(coinFlips)
+```
+
+
+```{r}
+library("dplyr")
+k = 0:numFlips
+numHeads = sum(coinFlips == "H")
+binomDensity = tibble(k = k,
+     p = dbinom(k, size = numFlips, prob = 0.5))
+
+
+library("ggplot2")
+ggplot(binomDensity) +
+  geom_bar(aes(x = k, y = p), stat = "identity") +
+  geom_vline(xintercept = numHeads, col = "blue")
+
+
+numSimulations = 10000
+outcome = replicate(numSimulations, {
+  coinFlips = sample(c("H", "T"), size = numFlips,
+                     replace = TRUE, prob = c(0.5, 0.5))
+  sum(coinFlips == "H")
+})
+ggplot(tibble(outcome)) + xlim(0, 100) +
+  geom_histogram(aes(x = outcome), binwidth = 1, center = 0) +
+  geom_vline(xintercept = numHeads, col = "blue")
+
+
+alpha = 0.05
+binomDensity = arrange(binomDensity, p) %>%
+        mutate(reject = (cumsum(p) <= alpha))
+
+ggplot(binomDensity) +
+  geom_bar(aes(x = k, y = p, col = reject), stat = "identity") +
+  scale_colour_manual(
+    values = c(`TRUE` = "red", `FALSE` = "darkgrey")) +
+  geom_vline(xintercept = numHeads, col = "blue") +
+  theme(legend.position = "none")
+
+
+binom.test(x = numHeads, n = numFlips, p = 0.5)
+```
+
+# 6.9 FDR
+```{r}
+library("DESeq2")
+library("airway")
+data("airway")
+aw   = DESeqDataSet(se = airway, design = ~ cell + dex)
+aw   = DESeq(aw)
+awde = as.data.frame(results(aw)) %>% dplyr::filter(!is.na(pvalue))
+
+ggplot(awde, aes(x = pvalue)) +
+  geom_histogram(binwidth = 0.025, boundary = 0)
+
+
+alpha = binw = 0.025
+pi0 = 2 * mean(awde$pvalue > 0.5)
+ggplot(awde,
+  aes(x = pvalue)) + geom_histogram(binwidth = binw, boundary = 0) +
+  geom_hline(yintercept = pi0 * binw * nrow(awde), col = "blue") +
+  geom_vline(xintercept = alpha, col = "red")
+```
+
