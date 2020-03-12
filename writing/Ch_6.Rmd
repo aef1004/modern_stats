@@ -83,3 +83,73 @@ ggplot(awde,
   geom_vline(xintercept = alpha, col = "red")
 ```
 
+
+# Exercise 6.4
+
+Make a less extreme example of correlated test statistics than the data duplication at the end of Section 6.5. Simulate data with true null hypotheses only, and let the data morph from having completely independent replicates (columns) to highly correlated as a function of some continuous-valued control parameter. Check type-I error control (e.g., with the p-value histogram) as a function of this control parameter.
+
+Null hypothesisi is that they're the same weight 
+
+```{r}
+
+library(ggplot2)
+library(ggbeeswarm)
+library(tibble)
+data("PlantGrowth")
+ggplot(PlantGrowth, aes(y = weight, x = group, col = group)) +
+  geom_beeswarm() + theme(legend.position = "none")
+tt = with(PlantGrowth,
+          t.test(weight[group =="ctrl"],
+                 weight[group =="trt2"],
+                 var.equal = TRUE))
+tt
+
+abs_t_null = with(
+  dplyr::filter(PlantGrowth, group %in% c("ctrl", "trt2")),
+    replicate(10000,
+      abs(t.test(weight ~ sample(group))$statistic)))
+
+ggplot(tibble(`|t|` = abs_t_null), aes(x = `|t|`)) +
+  geom_histogram(binwidth = 0.1, boundary = 0) +
+  geom_vline(xintercept = abs(tt$statistic), col = "red")
+
+mean(abs(tt$statistic) <= abs_t_null)
+
+# original data duplication
+with(rbind(PlantGrowth, PlantGrowth),
+       t.test(weight[group == "ctrl"],
+              weight[group == "trt2"],
+              var.equal = TRUE))
+
+
+
+# Simulate data with true null hypothesis
+library(dplyr)
+
+try_1_plant <- PlantGrowth %>%
+  filter(group == "ctrl") %>%
+  sample_n(7) 
+
+try_2_plant <- PlantGrowth %>%
+  filter(group == "trt2") %>%
+  sample_n(7) 
+
+with(rbind(try_1_plant, try_1_plant, try_2_plant, try_2_plant),
+     t.test(weight[group == "ctrl"],
+       weight[group == "trt2"],
+       var.equal = TRUE))
+
+
+
+# resampling 
+
+try_1_plant <- PlantGrowth %>%
+  filter(group == "ctrl") %>%
+  sample_n(7) 
+
+try_2_plant <- PlantGrowth %>%
+  filter(group == "trt2") %>%
+  sample_n(7) 
+
+```
+
