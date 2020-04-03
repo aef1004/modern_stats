@@ -74,6 +74,9 @@ fviz_pca_biplot(winePCAd, geom = "point", habillage = wine.class,
 
 # 7.8.3
 ```{r}
+#BiocManager::install("Hiiragi2013")
+
+
 data("x", package = "Hiiragi2013")
 xwt = x[, x$genotype == "WT"]
 sel = order(rowVars(Biobase::exprs(xwt)), decreasing = TRUE)[1:100]
@@ -89,5 +92,294 @@ fviz_eig(pcaMouse) + ggtitle("")
 
 fviz_pca_ind(pcaMouse, geom = "point", col.ind = xwt$sampleGroup) +
   ggtitle("") + coord_fixed()
+```
+
+# Exercise 7.4
+```{r}
+library(tidyverse)
+library(Biobase)
+
+data("x", package = "Hiiragi2013")
+
+# Unweighted PCA
+```
+
+## Weighted PCA example (7.8.3)
+
+```{r}
+# Uncomment and run the next line if you don't have the `Hiiragi2013` package
+# BiocManager::install("Hiiragi2013")
+
+data("x", package = "Hiiragi2013")
+class(x)
+str(x, max.level = 2)
+x@phenoData # Remember that you can use `@` to extract an element from an S4 object
+str(x@phenoData)
+
+x %>% 
+  exprs() %>% 
+  `[`(1:10, 1:10) # Using a trick to pipe into the `[ , ]`-style subsetting function
+                  # It's an "in-fix" function (like "+" and "/"), so you usually use
+                  # it within a line of code (instead of with parentheses). However, 
+                  # all of those will also work like regular functions if you surround
+                  # the name with backticks, so '1 + 2' is the same in R as '`[`(1, 2)'.
+```
+
+
+Functions like `exprs`, which exist only to extract some of the data stored in a certain
+type of object, are called *extractor* functions. If you need to get all the way to a 
+dataframe, run `as_tibble` (from the tidyverse) or `as.data.frame` (from base R) right 
+after you extract these data. 
+
+You can use `ggplot2` to explore the data, although keep in mind that the column names
+aren't in a standard formula. Instead, they start with numbers and have spaces:
+
+```{r}
+x %>% 
+  exprs() %>% 
+  colnames() %>% 
+  head()
+```
+
+That means that you'll need to "protect" the column name in any tidyverse code, 
+by using backticks around the column name. For example, you can run the following to 
+create a histogram of expression levels in the first column (the first animal sample?): 
+
+```{r fig.align = "center", fig.width = 3, fig.height = 2}
+x %>% 
+  exprs() %>% 
+  as_tibble() %>% 
+  ggplot(aes(x = `1 E3.25`)) + 
+  geom_histogram(bins = 100)
+```
+
+If you'd like to get histograms for several of these, you can take advantage of 
+`pivot_longer` and facetting to do that. For example, to create these for the 
+a random sample of twelve columns, run: 
+
+```{r}
+x %>% 
+  exprs() %>% 
+  as_tibble() %>% 
+  select(sample(1:ncol(.), size = 12)) %>%  # Sample twelve columns. The `.` is a "pronoun"--
+                                            # it refers to the dataframe you've just piped in
+  pivot_longer(cols = 1:12, names_to = "sample", values_to = "level") %>% 
+  ggplot(aes(x = level)) + 
+  geom_histogram(bins = 100) + 
+  facet_wrap(~ sample)
+```
+
+It looks like each of the original column names includes "FGF4-KO" if the sample animal is
+a mutant, rather than a wild-type. We might want to use the fill of the bars to show which
+samples are wild-type versus mutant. Once you've made the data longer, you can use
+regular expressions to determine, based on whether a label includes "FGF4-KO", if the
+animal is a mutant, and then use that when you plot:
+
+```{r}
+x %>% 
+  exprs() %>% 
+  as_tibble() %>% 
+  select(sample(1:ncol(.), size = 12)) %>% 
+  pivot_longer(cols = 1:12, names_to = "sample", values_to = "level") %>% 
+  mutate(mutant = str_detect(sample, "(FGF4-KO)")) %>% # Use regular expressions here
+  ggplot(aes(x = level, fill = mutant)) +  # Add the mapping to fill for the `mutant` column
+  geom_histogram(bins = 100) + 
+  facet_wrap(~ sample) + 
+  theme(legend.position = "bottom")
+```
+
+It looks like each row is for a separate gene (? mRNA? transcript?). You might want to 
+instead get histograms for each of those (instead of by sample). I think the easiest way
+to do that would be to transpose the data first (`t`---that is, flip the rows and columns)
+and then continue from there: 
+
+```{r}
+x %>% 
+  exprs() %>% 
+  t() %>% # Here's where I'm switching rows and columns
+  as_tibble() %>% 
+  select(sample(1:ncol(.), size = 12)) %>% 
+  pivot_longer(cols = 1:12, names_to = "transcript", values_to = "level") %>% 
+  ggplot(aes(x = level)) +  
+  geom_histogram(bins = 100) + 
+  facet_wrap(~ transcript) 
+```
+
+Correlation matrices might be interesting here, too. The `ggcorrplot` package has some 
+nice functions for making those. First, check out the size of the data: 
+
+```{r}
+x %>% 
+  exprs() %>% 
+  dim()
+```
+
+We could probably fit 101 values in a correlation plot, so we could do one of all the 
+samples, but we probably can't for all the gene expression levels (over 45,000!). We can
+look to see correlation patterns in that, but we probably should look at just a sample, not
+everything at once.
+
+```{r}
+library(ggcorrplot)
+x %>% 
+  exprs() %>% 
+  t() %>% 
+  as_tibble() %>% 
+  select(sample(1:ncol(.), size = 100)) %>% 
+  cor() %>%  # Calculate the correlation matrix
+  ggcorrplot(outline.col = "white", type = "upper") + 
+  theme_void() # No point in having x and y labels right now---they'll be too small to see
+```
+
+It looks like you probably have some columns that are pretty strongly correlated with 
+each other, both negatively and positively.
+
+## Tidier version of code in book
+
+The code in the book walks you through doing a weighted PCA. They first recommend
+that you limit the data to the wild-type samples and then select the 100 features (genes?)
+with the highest overall variance. Here's a "tidier" way to do that than in the book.
+
+First, you can use one pipeline to make a dataframe that's limited to the 66 wild-type
+samples and the top 100 features by variance. We're transposing it along the way (`t`), 
+so it will be in the right format for the `dudi.pca` call later:
+
+```{r}
+simpl_data <- x %>% 
+  exprs() %>% 
+  t() %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "sample") %>% 
+  filter(!str_detect(sample, "(FGF4-KO)")) %>% 
+  pivot_longer(-sample, names_to = "transcript", values_to = "level") %>% 
+  group_by(transcript) %>% 
+  nest() %>% 
+  mutate(var = map_dbl(.x = data, .f = ~ var(.x$level))) %>% # Calculate the variance for 
+                                                             # each transcript
+  ungroup() %>% 
+  top_n(n = 100, wt = var) %>% # Extract the top 100 transcripts in terms of variance 
+  select(-var) %>% # We don't need the variance now that we've picked the top 100, go remove it
+  unnest(data) %>% # Unnest the data
+  pivot_wider(names_from = transcript, values_from = level) # Make wide again
+simpl_data
+```
+
+You can see our new data frame has 66 samples (just the wild-type samples) and 101 columns
+(the sample names, then the 100 genes with the largest variance in expression levels).
+
+We can pull out the group from them (in each sample name, everything from "E" later)
+using regular expressions:
+
+```{r}
+simpl_data <- simpl_data %>% 
+  mutate(group = str_extract(sample, "E.+")) # Pull everything starting from "E" in 'sample'
+simpl_data %>% 
+  select(sample, group)
+```
+
+Next, they want us to create a weight for each sample, as the inverse of how many total 
+samples there are in its group. 
+
+```{r}
+simpl_data <- simpl_data %>% 
+  group_by(group) %>% # Group by 'group' so we can get the total count for each group
+  mutate(n_in_group = n(), # When things are grouped, `mutate` will *add* the summary
+                           # information as a column, while keeping the same number of rows
+                           # as the original 
+         weight = 1 / n_in_group) %>% # We want the weight to be 1 / the number of groups
+  ungroup()
+# Here's an example of what a few of these look like now:
+simpl_data %>% 
+  select(sample, group, n_in_group, weight) %>% 
+  sample_n(6)
+```
+
+```{r}
+library(ade4)
+pcaMouse <- simpl_data %>% 
+  select(-sample, -group, -n_in_group, -weight) %>% 
+  dudi.pca(center = TRUE, scale = TRUE, nf = 2, scannf = FALSE, 
+           row.w = simpl_data$weight)
+pcaMouse
+library(factoextra)
+pcaMouse %>% 
+  fviz_eig() + 
+  ggtitle("")
+```
+
+```{r}
+pcaMouse %>% 
+  fviz_pca_ind(geom = "point", col.ind = simpl_data$group) + 
+  ggtitle("") + 
+  coord_fixed() 
+```
+
+
+E: Embryonic day
+genes as columns
+
+```{r}
+colnames(simpl_data)
+
+simpl_data %>%
+  select(group, n_in_group) %>%
+  unique()
+
+for_7_8 <- simpl_data %>%
+  select(-sample, -group, -n_in_group, -weight)
+
+pca_unweight <- dudi.pca(for_7_8, center = TRUE, scale = TRUE, scannf = FALSE)
+
+fviz_eig(pca_unweight, geom = "bar", bar_width = 0.7) +
+  ggtitle("Unweighted")
+
+fviz_pca_biplot(pca_unweight, geom = "point")
+
+fviz_pca_var(pca_unweight)
+
+```
+Can try downsampling 
+
+```{r}
+# weighted data
+weighted_data <- simpl_data %>%
+  group_by(group) %>%
+  sample_n(size = 4) %>%
+  ungroup()
+
+weighted_for_pca <- weighted_data %>%
+  select(-sample, -group, -n_in_group, -weight)
+
+colnames(weighted_for_pca)
+
+pca_weight <- dudi.pca(weighted_for_pca, center = TRUE, scale = TRUE, scannf = FALSE)
+
+fviz_eig(pca_weight, geom = "bar", bar_width = 0.7) +
+  ggtitle("Weighted")
+
+fviz_pca_biplot(pca_weight, geom = "point")
+
+# could create a variable for 
+fviz_pca_var(pca_weight)
+
+# c1 first principal component 
+pca_weight$c1 %>%
+  rownames_to_column("genes") %>%
+  mutate(new = sqrt((CS1^2) + (CS2^2))) %>%
+  arrange(desc(new))
+
+```
+The most correlated by both the principal components: 1420086_x_at
+
+```{r}
+
+top_10 <- pca_weight
+
+top_10$c1 <- pca_weight$c1 %>%
+  arrange(desc(CS1)) %>%
+  top_n(10)
+
+fviz_pca_biplot(top_10, geom = "point")
+
 ```
 
