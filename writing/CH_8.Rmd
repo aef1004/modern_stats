@@ -1,0 +1,84 @@
+---
+title: "Ch_8"
+author: "Amy Fox"
+date: "4/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Exercise 8.1
+
+```{r}
+library(edgeR)
+```
+
+Example data - Quick start
+```{r}
+x <- read.delim("TableOfCounts.txt",row.names="Symbol")
+group <- factor(c(1,1,2,2))
+y <- DGEList(counts=x,group=group)
+y <- calcNormFactors(y)
+design <- model.matrix(~group)
+y <- estimateDisp(y,design)
+
+
+
+#To perform quasi-likelihood F-tests:
+fit <- glmQLFit(y,design)
+qlf <- glmQLFTest(fit,coef=2)
+topTags(qlf)
+
+#To perform likelihood ratio tests:
+fit <- glmFit(y,design)
+lrt <- glmLRT(fit,coef=2)
+topTags(lrt)
+```
+
+
+```{r}
+fn <- system.file("extdata", "pasilla_gene_counts.tsv", 
+                  package = "pasilla", mustWork = TRUE)
+fn
+
+counts <- fn %>% 
+  read_tsv() %>%
+  column_to_rownames("gene_id")
+
+counts
+
+group <- factor(c(1, 1, 1, 1, 2, 2, 2))
+
+y <- DGEList(counts=counts, group=group)
+
+y <- calcNormFactors(y)
+
+design <- model.matrix(~group)
+y <- estimateDisp(y,design) # 
+
+fit <- glmQLFit(y,design)
+qlf <- glmQLFTest(fit,coef=2)
+
+topTags(qlf, n = 14599) %>%
+  as.data.frame() %>%
+  mutate(low_padj = FDR < 0.1) %>% 
+  mutate(log2FoldChange = ifelse(logFC > 2, 2, logFC),
+         log2FoldChange = ifelse(logFC < -2, -2, logFC)) %>% 
+  ggplot(aes(x = logCPM, y = log2FoldChange, color = low_padj)) + 
+  geom_point(size = 0.5) + 
+  ylim(c(-2, 2)) + 
+  scale_color_manual(values = c("black", "red")) + 
+  scale_x_continuous(trans = "pseudo_log") + 
+  geom_hline(yintercept = 0, color = "red", size = 2, alpha = 0.4)
+
+# lowest 10 genes
+topTags(qlf, n = 10)
+
+fn  %>%
+  read_tsv() %>%
+  filter(gene_id == "FBgn0039155" | gene_id == "FBgn0034434" | gene_id == "FBgn0000003")
+
+# when you don't have any counts, you don't have anything to compare to 
+```
