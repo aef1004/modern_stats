@@ -13,6 +13,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 library(edgeR)
+library(dplyr)
+library(readr)
+library(tidyverse)
 ```
 
 Example data - Quick start
@@ -81,4 +84,5 @@ fn  %>%
   filter(gene_id == "FBgn0039155" | gene_id == "FBgn0034434" | gene_id == "FBgn0000003")
 
 # when you don't have any counts, you don't have anything to compare to 
+
 ```
