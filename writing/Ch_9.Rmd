@@ -1,0 +1,59 @@
+---
+title: "Ch_9"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Exercise 9.2 (pg 246)
+
+```{r}
+library(ade4)
+library(factoextra)
+```
+
+Read in the data
+```{r}
+# this is the data
+color_matrix <- t(data.frame(
+                              quiet = c(2770, 2150, 2140, 875, 1220, 821, 2510),
+                              angry = c(2970, 1530, 1740, 752, 1040, 710, 1730),
+                              clever = c(1650, 1270, 1320, 495, 693, 416, 1420),
+                              depressed = c(1480, 957, 983, 147, 330, 102, 1270),
+                              happy = c(19300, 8310, 8730, 1920, 4220, 2610, 9150),
+                              lively = c(1840, 1250, 1350, 659, 621, 488, 1480),
+                              perplexed = c(110,  71,  80,  19,  23,  15, 109),
+                              virtuous = c(179,  80, 102,  20,  25,  17, 165)))
+
+
+colnames(color_matrix) <- c('black','blue','green','grey','orange','purple','white')
+```
+
+
+Code from Daniel 
+```{r fig.width = 4, fig.height = 4}
+
+# n = 4 the number of dimensions
+color_matrix_ca <- dudi.coa(color_matrix, n = 4, scannf= FALSE)
+fviz_eig(color_matrix_ca, geom = "bar")
+
+
+fviz_ca_row(color_matrix_ca, axes = c(1,2))
+
+mosaicplot(color_matrix, shade = TRUE, las = 1, type = "pearson", cex.axis = 0.7)
+
+rowsums_colors <- as.matrix(apply(color_matrix, 1, sum))
+colsums_colors <- as.matrix(apply(color_matrix, 2, sum))
+
+expected_colors <- rowsums_colors %*% t(colsums_colors)/sum(colsums_colors)
+
+
+residual_table_colors <- round(t(color_matrix- expected_colors))
+
+fviz_ca_biplot(color_matrix_ca)
+```
+HAppy and black are similar 
+
+Black and grey are most dissimilar - so not google together
