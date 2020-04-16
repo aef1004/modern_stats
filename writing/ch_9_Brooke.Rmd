@@ -1,0 +1,279 @@
+---
+title: "Chapter 9 examples"
+author: "Brooke Anderson"
+date: "4/15/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+
+## Example---bacterial abundance
+
+This is used in section 9.3. It covers a study that compared healthy to diseased
+(irritable bowel syndrome) mice. It's looking at the bacterial abundance in these
+two groups, particularly if there's evidence of important differences between the
+healthy and diseased mice.
+
+This data is stored in a binary R file format (".rds"). You can read it into 
+R with the function `readRDS`:
+
+```{r}
+ibd_chip <- readRDS("data/vsn28Exprd.rds")
+```
+
+This data is in a matrix. Each column is a sample and each rows gives observations, 
+so this is another example of the "transposed" data format we're coming across
+for a lot of these biological datasets in R. All rows expect the last one give the
+measurements in each sample for a specific bacterial taxon, so looking across each 
+row provides an estimate of how the abundance of bacteria in that taxon vary 
+across the samples. Based on the text in the book, these abundance measurements
+have already been normalized in some way (maybe this is why they don't show
+up as whole-number counts?).
+
+Some information
+is stored in the rownames (a identifier of the bacterial taxon given on that row),
+so if you change this to a dataframe at any point, you'll
+probably want to bring the rownames into a column (`rownames_to_column` from 
+the `tibble` package, for example) so you don't lose that information. 
+
+```{r}
+ibd_chip %>% 
+  head()
+```
+
+You can check out the size of the data:
+
+```{r}
+ibd_chip %>% 
+  dim() 
+```
+
+It looks like there are 28 samples and that they measured 8635 observations for each
+(although we'll see in a minute that one of these was just the day the sample 
+was analyzed).
+
+They ask us to look at the last row of the data. You can use `tail` (from base R) 
+to do this (it defaults to show the last 6 rows): 
+
+```{r}
+ibd_chip %>% 
+  tail()
+```
+
+The `day` row gives the day (day 1 or day 2) that the sample is collected. In this section,
+we'll be looking at whether the data shows evidence of batch effects by day (i.e., 
+that the samples collected on the same day tend to be more similar to each other than
+when comparing samples analyzed on two different days).
+
+To get a summary of the `day` information, one approach is to transpose the data (`t`), 
+change it to a tibble (`as_tibble`), then pull out the `day` column as a vector and
+pipe it through `summary` to get a summary of that vector:
+
+```{r}
+ibd_chip %>% 
+  t() %>% 
+  as_tibble() %>% 
+  pull(day) %>% 
+  summary()
+```
+
+You can see that it looks like the data were collected across three days, so 
+this variable can take the values 1 (first day), 2 (second day), or 3 (third day).
+
+To explore the data, it might be interesting to first see how the average bacterial
+abundance (averaged across samples) varies across all the 8,000-some taxa measured:
+
+```{r}
+ibd_chip %>% 
+  t() %>% # Transpose the data
+  as_tibble() %>% 
+  select(-day) %>% # Get rid of the `day` column for this analysis
+  summarize_all(.funs = mean) %>% # Get the mean value for each column 
+  pivot_longer(everything(), # Here, the `everything()` means to pivot all the columns
+               names_to = "taxon", values_to = "abundance") %>% 
+  ggplot(aes(x = abundance)) + 
+  geom_histogram()
+```
+
+It looks like the abundance measurements for most taxa are in the 7--8 range, all are 
+positive, and a few are as high as 14 or 15. 
+
+We can take a look at how these measurements vary by day for a random sample of the
+bacterial taxa measured. In this pipeline, I've used nesting to allow for a random sample
+of 16 of the bacterial taxa and then used a plot with faceting by taxa to look at the
+measurements by day:
+
+```{r}
+ibd_chip %>% 
+  t() %>% # Transpose the matrix
+  as.data.frame() %>%  # Convert to a dataframe
+  rownames_to_column(var = "sample_id") %>% # Make sure to keep the rownames (sample id now)
+  pivot_longer(-c(sample_id, day),    # Pivot all the taxon columns (but not sample id or day)
+               names_to = "taxon", values_to = "abundance") %>% 
+  group_by(taxon) %>% 
+  nest() %>% # Sample 20 random taxa from all that are measured
+  ungroup() %>% 
+  sample_n(size = 16) %>% 
+  unnest(data) %>% 
+  mutate(day = as_factor(day)) %>% # Change day to a factor---better axis labels in this case
+  ggplot(aes(x = day, y = abundance)) + 
+  geom_point(alpha = 0.2) + 
+  facet_wrap(~ taxon, ncol = 4, scales = "free_y")
+```
+
+In some cases, it does look like samples measured on the same day tend to group together in 
+their measurements of abundance, so that abundance measuremens for some taxa tend to be 
+more similar for samples measured on the same day compared to samples measured on different
+days.
+
+In the text, they decided to do a rank-threshold transformation. The rules for that transform
+are: 
+
+1. Within each sample, rank all the taxa in terms of their abundance (1 to 8,635, with 
+1 as the most abundant)
+2. For the first 3,000 in rank for that sample, replace the measured (normalized) 
+abundance with a function of the rank (e.g., "3,000" for the most abundant, "2,999" for the
+next most abundant). 
+3. For the others, replace the measured (normalized) abundance with 1 (i.e., they 
+all "tie" at a very low rank)
+
+Here's an alternative way to do that compared to the code in the book (this includes 
+filtering to only the samples taking on days 1 and 2, as they do in the book):
+
+```{r}
+ibd_new <- ibd_chip %>% 
+  t() %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "sample_id") %>% 
+  filter(day %in% c(1, 2)) %>% # Filter to samples analyzes on days 1 and 2
+  mutate(day = as_factor(day)) %>% # Convert `day` to a factor (for visualization later)
+  pivot_longer(-c(sample_id, day), names_to = "taxon", values_to = "abundance") %>% 
+  group_by(sample_id) %>% 
+  mutate(rank = rank(abundance)) %>% # Rank the abundance values in each sample
+  ungroup() %>% 
+  mutate(rank_transform = case_when( # Create the rank-threshold transformation based on rank
+    rank <= 3000 ~ 3000 - rank, # This is what you do if the rank is 3,000 or lower
+    TRUE ~ as.numeric(1)        # This is what you do if it's not
+  ))
+
+ibd_new
+```
+
+You can check that you did this right by visualizing these rank-threshold transformation
+values for one of the samples:
+
+```{r}
+ibd_new %>% 
+  filter(sample_id == first(sample_id)) %>% # Limit to values for the first sample
+  ggplot(aes(x = rank, y = rank_transform)) + 
+  geom_point() + 
+  geom_vline(xintercept = 3000, col = "red", linetype = 2) # Add a line to show the threshold
+```
+
+Then, they ask you to run a PCA of the data, but using these rank-threshold
+transformation values instead of the original values: 
+
+```{r}
+library(ade4)
+pca_result <- ibd_new %>% 
+  select(-c(abundance, rank_transform)) %>% 
+  pivot_wider(names_from = taxon, values_from = rank) %>% 
+  select(-sample_id, -day) %>% 
+  dudi.pca(scannf = FALSE, nf = 2) %>% 
+  pluck("li")
+pca_result
+
+pca_result <- ibd_new %>% 
+  group_by(sample_id) %>% 
+  slice(1) %>% 
+  ungroup() %>% 
+  select(sample_id, day) %>% 
+  bind_cols(pca_result)
+pca_result
+```
+
+Here's an alternative way to create the plot shown in Figure 9.11:
+
+```{r}
+library(ggrepel) 
+# Calculate the hull for each group
+hull <- pca_result %>%
+  group_by(day) %>%
+  slice(chull(Axis1, Axis2))
+# Create the plot and add the hull
+ggplot(pca_result, aes(x = Axis1, y = Axis2, color = day, fill = day)) + 
+  geom_point() + 
+  geom_vline(xintercept = 0, linetype = 2) + 
+  geom_hline(yintercept = 0, linetype = 2) + 
+  geom_text_repel(aes(label = sample_id), show.legend = FALSE) + # Add labels for each sample
+  coord_fixed() + # Forces anratio of x-unit distance to y-unit distance of 1
+  labs(x = "First principal component", 
+       y = "Second principal component") + 
+  geom_polygon(data = hull, alpha = 0.5) # This adds the hull (shaded region)
+```
+
+Evidently, they used measurements on the third day to try to tease apart why they 
+see these differences between days 1 and 2. There are two difference in the days: 
+(1) the protocol used and (2) provenences for the arrays (? I'm not completely sure 
+what this means...). If we add in the measurements for day three, it might help
+tease apart differences (because they ran these with the protocol from one of the
+days and the array from the other day, so whichever group this new group "hangs
+out" with in the PCA will help us figure out what piece is explaining the variation).
+
+```{r}
+# Same as before, but keep day 3
+ibd_new2 <- ibd_chip %>% 
+  t() %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "sample_id") %>% 
+  mutate(day = as_factor(day)) %>% # Convert `day` to a factor (for visualization later)
+  pivot_longer(-c(sample_id, day), names_to = "taxon", values_to = "abundance") %>% 
+  group_by(sample_id) %>% 
+  mutate(rank = rank(abundance)) %>% # Rank the abundance values in each sample
+  ungroup() %>% 
+  mutate(rank_transform = case_when( # Create the rank-threshold transformation based on rank
+    rank <= 3000 ~ 3000 - rank, # This is what you do if the rank is 3,000 or lower
+    TRUE ~ as.numeric(1)        # This is what you do if it's not
+  ))
+
+# Re-run PCA and join with data on the day of measurement
+pca_result2 <- ibd_new2 %>% 
+  select(-c(abundance, rank_transform)) %>% 
+  pivot_wider(names_from = taxon, values_from = rank) %>% 
+  select(-sample_id, -day) %>% 
+  dudi.pca(scannf = FALSE, nf = 2) %>% 
+  pluck("li")
+pca_result2 <- ibd_new2 %>% 
+  group_by(sample_id) %>% 
+  slice(1) %>% 
+  ungroup() %>% 
+  select(sample_id, day) %>% 
+  bind_cols(pca_result2)
+
+# Create the plot
+hull2 <- pca_result2 %>%
+  group_by(day) %>%
+  slice(chull(Axis1, Axis2))
+ggplot(pca_result2, aes(x = Axis1, y = Axis2, color = day, fill = day)) + 
+  geom_point() + 
+  geom_vline(xintercept = 0, linetype = 2) + 
+  geom_hline(yintercept = 0, linetype = 2) + 
+  geom_text_repel(aes(label = sample_id), show.legend = FALSE) + 
+  coord_fixed() + 
+  labs(x = "First principal component", 
+       y = "Second principal component") + 
+  geom_polygon(data = hull2, alpha = 0.5) 
+```
+
+Since the samples from the third day are close to the ones from the first day, 
+and since the samples for the third day were run using the protocol from day 1 but 
+the assay from day 2, this result suggests that variation between the measurements on 
+day 1 and day 2 result from differences in the protocol much more than differences
+in the array.
