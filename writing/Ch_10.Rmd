@@ -1,0 +1,85 @@
+---
+title: "Ch_10"
+author: "Amy Fox"
+date: "4/20/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("phangorn")
+library("ggtree")
+load("../data/tree1.RData")
+```
+
+```{r}
+ggtree(tree1, lwd = 2, color = "darkgreen", alpha = 0.8, right = TRUE) +
+  geom_tiplab(size = 7, angle = 90, offset = 0.05) +
+  geom_point(aes(shape = isTip, color = isTip), size = 5, alpha = 0.6)
+```
+
+```{r}
+seqs6 = simSeq(tree1, l = 60, type = "DNA", bf = c(1, 1, 3, 3)/8, rate = 0.1)
+seqs6
+```
+
+
+I don't understand what this is actually showing here
+Is it just saying that the acgt is the sequence at each branch of the tree?
+```{r}
+mat6df = data.frame(as.character(seqs6))
+p = ggtree(tree1, lwd = 1.2) + geom_tiplab(aes(x = branch), size = 5, vjust = 2)
+gheatmap(p, mat6df[, 1:60], offset = 0.01, colnames = FALSE)
+
+```
+
+What exactly is the fit showing here...
+```{r}
+tree.nj = nj(dist.ml(seqs6, "JC69"))
+ggtree(tree.nj) + geom_tiplab(size = 7) + ggplot2::xlim(0, 0.8)
+
+
+fit = pml(tree1, seqs6, k = 4)
+```
+
+```{r}
+library("dada2")
+seqtab = readRDS("../data/seqtab.rds")
+seqs = getSequences(seqtab)
+names(seqs) = seqs
+```
+
+Problem with the fastaRef - where is this file
+```{r}
+fastaRef = "../tmp/rdp_train_set_16.fa.gz"
+taxtab = assignTaxonomy(seqtab, refFasta = fastaRef)
+taxtab = readRDS(file= "../data/taxtab16.rds")
+dim(taxtab)
+```
+
+```{r}
+taxtab %>% `rownames<-`(NULL) %>% head
+```
+
+
+```{r}
+readLines("../data/mal2.dna.txt") %>% head(12) %>% cat(sep="\n")
+```
+
+```{r}
+library("DECIPHER")
+alignment = AlignSeqs(DNAStringSet(seqs), anchor = NA, verbose = FALSE)
+
+phangAlign = phangorn::phyDat(as(alignment, "matrix"), type = "DNA")
+dm = phangorn::dist.ml(phangAlign)
+treeNJ = phangorn::NJ(dm) # Note, tip order != sequence order
+fit = phangorn::pml(treeNJ, data = phangAlign)
+fitGTR = update(fit, k = 4, inv = 0.2)
+fitGTR = phangorn::optim.pml(fitGTR, model = "GTR", optInv = TRUE,
+         optGamma = TRUE,  rearrangement = "stochastic",
+         control = phangorn::pml.control(trace = 0))
+```
+
