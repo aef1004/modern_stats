@@ -51,7 +51,7 @@ then you can read it in with something like (the exact filepath will depend on
 how you've structured your directory):
 
 ```{r}
-load("data/tree1.RData")
+load("../data/tree1.RData")
 ```
 
 You should now see that you have ab object in your workspace named "tree" (the 
@@ -276,6 +276,8 @@ tree_nj %>%
 Generate the maximum likelihood score of the original tree based on the simulated
 tree data: 
 
+aic or bic for a model 
+**Want to maximize the loglikelihood number** 
 ```{r}
 # k gives the number of intervals of the discrete gamma distribution (?)
 # The default is to assume a shape parameter of 1 for the gamma distribution
@@ -567,4 +569,7 @@ g1 %>%
   geom_edges() + 
   geom_nodes(aes(x = x, y = y), size = 6, color = "dodgerblue") 
 ```
+
+
+
 
