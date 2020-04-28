@@ -7,22 +7,98 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+```{r}
+library(EBImage)
+imagefile <- "../data/mosquito.png"
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+mosq = readImage(imagefile)
+display(mosq)
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+# this converts it to a normal image without the html widget options (zoom in/out)
+display(mosq, method = "raster") 
+text(x = 85, y = 800, label = "A mosquito",
+     adj = 0, col = "orange", cex = 1.5)
 
-```{r cars}
-summary(cars)
+imagefile <- "../data/hiv.png"
+hivc = readImage(imagefile)
+display(hivc)
+
+# can display multiple images at once
+nuc = readImage(system.file("images", "nuclei.tif",
+                            package = "EBImage"))
+display(1 - nuc, method = "raster", all = TRUE)
+```
+11.8
+```{r}
+imagefiles = system.file("images", c("image-DAPI.tif",
+  "image-FITC.tif", "image-Cy3.tif"), package="MSMB")
+
+cells = readImage(imagefiles)
+
+apply(cells, 3, range)
+
+# normalize so that the cells have a range from [0,1]
+cells[,,1]   = 32 * cells[,,1]
+cells[,,2:3] = 16 * cells[,,2:3]
+apply(cells, 3, range)
 ```
 
-## Including Plots
+```{r}
+library("readr")
+library("dplyr")
+library(ggplot2)
+cellclasses = c("T_cells", "Tumor", "DCs", "other_cells")
+brcalymphnode = lapply(cellclasses, function(k) {
+    read_csv(file.path("..", "data",
+             sprintf("99_4525D-%s.txt", k))) %>%
+    transmute(x = globalX,
+              y = globalY,
+              class = k)
+}) %>% bind_rows %>% mutate(class = factor(class))
 
-You can also embed plots, for example:
+brcalymphnode
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+ggplot(filter(brcalymphnode, class %in% c("T_cells", "Tumor")),
+   aes(x = x, y = y, col = class)) + geom_point(shape = ".") +
+   facet_grid( . ~ class) + guides(col = FALSE)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+library("spatstat")
+
+ln = with(brcalymphnode,
+  ppp(x = x, y = y, marks = class, xrange = range(x), yrange = range(y)))
+ln
+
+library("geometry")
+coords = cbind(ln$x, ln$y)
+chull = convhulln( coords )
+
+pidx = integer(nrow(chull) + 1)
+pidx[1:2] = chull[1, ]
+chull[1, ] = NA
+for(j in 3:length(pidx)) {
+  wh = which(chull == pidx[j-1], arr.ind = TRUE)
+  stopifnot(nrow(wh )== 1)
+  wh[, "col"] = 3 - wh[, "col"] ## 2->1, 1->2
+  pidx[j] = chull[wh]
+  chull[wh[, "row"], ] = NA
+}
+pidx = rev(pidx)
+
+ggplot(tibble(x = ln$x, y = ln$y)[pidx, ], aes(x = x, y = y)) +
+  geom_point() + geom_path() + coord_fixed()
+
+ln = with(brcalymphnode,
+   ppp(x = x, y = y, marks = class, poly = coords[ pidx, ],
+       check = FALSE))
+ln
+
+d = density(subset(ln, marks == "Tumor"), edge=TRUE, diggle=TRUE)
+plot(d)
+
+rr = relrisk(ln, sigma = 250)
+
+plot(rr)
+```
+
