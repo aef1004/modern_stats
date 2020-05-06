@@ -83,3 +83,51 @@ fitGTR = phangorn::optim.pml(fitGTR, model = "GTR", optInv = TRUE,
          control = phangorn::pml.control(trace = 0))
 ```
 
+# Exercise 10.8 (p. 277)
+```{r}
+library(ape)
+library(phangorn)
+
+GAG = read.dna("../data/DNA_GAG_20.txt")
+
+ape_dist <- dist.dna(GAG, model = "JC69", as.matrix = TRUE)# ape
+
+ham_dist <- dist.hamming(GAG) %>%
+  as.matrix()# phangorn 
+
+phang_dist <- dist.ml(GAG, "JC69")%>%
+  as.matrix() # phangorn 
+
+plot(c(ape_dist), c(ham_dist), main = "Ape JC distance vs. Hamming distance", xlab = "Ape JC", ylab = "Hamming Distance")
+
+plot(c(phang_dist), c(ham_dist), col = "blue", main = "Phangorn JC distance vs. Hamming distance", xlab = "Phangorn JC", ylab = "Hamming Distance")
+
+# The Phangorn JC matches better with the hamming distance, but they're both pretty similar 
+```
+
+
+```{r}
+ape_tree= nj(ape_dist)
+ham_tree= nj(ham_dist)
+phang_tree= nj(phang_dist)
+
+ggtree(ape_tree) + 
+  geom_tiplab(size = 4) + 
+  ggplot2::xlim(0, 0.8) +
+  ggtitle("Ape Tree")
+
+ggtree(ham_tree) + 
+  geom_tiplab(size = 4) + 
+  ggplot2::xlim(0, 0.8) +
+  ggtitle("Hamming Tree")
+
+ggtree(phang_tree) + 
+  geom_tiplab(size = 4) + 
+  ggplot2::xlim(0, 0.8) +
+  ggtitle("Phangorn Tree")
+
+ggplot(ape_dist, aes(x = ))
+
+ham_dist
+```
+

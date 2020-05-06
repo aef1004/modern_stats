@@ -1,0 +1,117 @@
+---
+title: "Ch_11_Exercise"
+output: html_document
+---
+Conduct the analyses for spatial dependence (11.17) using different cell types than those used in the book's code.
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("readr")
+library("dplyr")
+library(ggplot2)
+cellclasses = c("T_cells", "Tumor", "DCs", "other_cells")
+brcalymphnode = lapply(cellclasses, function(k) {
+    read_csv(file.path("..", "data",
+             sprintf("99_4525D-%s.txt", k))) %>%
+    transmute(x = globalX,
+              y = globalY,
+              class = k)
+}) %>% bind_rows %>% mutate(class = factor(class))
+
+brcalymphnode
+
+ggplot(filter(brcalymphnode, class %in% c("T_cells", "Tumor")),
+   aes(x = x, y = y, col = class)) + geom_point(shape = ".") +
+   facet_grid( . ~ class) + guides(col = FALSE)
+```
+
+```{r}
+library("spatstat")
+
+ln = with(brcalymphnode,
+  ppp(x = x, y = y, marks = class, xrange = range(x), yrange = range(y)))
+ln
+
+library("geometry")
+coords = cbind(ln$x, ln$y)
+chull = convhulln( coords )
+
+pidx = integer(nrow(chull) + 1)
+pidx[1:2] = chull[1, ]
+chull[1, ] = NA
+for(j in 3:length(pidx)) {
+  wh = which(chull == pidx[j-1], arr.ind = TRUE)
+  stopifnot(nrow(wh )== 1)
+  wh[, "col"] = 3 - wh[, "col"] ## 2->1, 1->2
+  pidx[j] = chull[wh]
+  chull[wh[, "row"], ] = NA
+}
+pidx = rev(pidx)
+
+ggplot(tibble(x = ln$x, y = ln$y)[pidx, ], aes(x = x, y = y)) +
+  geom_point() + geom_path() + coord_fixed()
+
+ln = with(brcalymphnode,
+   ppp(x = x, y = y, marks = class, poly = coords[ pidx, ],
+       check = FALSE))
+ln
+
+d = density(subset(ln, marks == "Tumor"), edge=TRUE, diggle=TRUE)
+plot(d)
+
+rr = relrisk(ln, sigma = 250)
+
+plot(rr)
+
+gln = Gest(ln)
+gln
+```
+
+**It really starts here**
+
+**Tumor**
+```{r}
+Lln = Linhom(subset(ln, marks == "Tumor"))
+Lln
+
+plot(Lln, lty = 1)
+
+pcfln = pcf(Kinhom(subset(ln, marks=="Tumor")))
+
+plot(pcfln, lty = 1)
+plot(pcfln, lty = 1, xlim = c(0,10))
+```
+
+Therefore, the cells really close to each other repel a small amount (basically they aren't on top of each other), but they do cluster.
+
+**DCs**
+
+iso is where the intensity is the same regardless of the direction you're moving in
+```{r}
+Lln = Linhom(subset(ln, marks == "DCs"))
+Lln
+
+plot(Lln, lty = 1)
+
+pcfln = pcf(Kinhom(subset(ln, marks=="DCs")))
+
+plot(pcfln, lty = 1)
+plot(pcfln, lty = 1, xlim = c(0,10))
+```
+
+These cells definitely cluster as g(r)>1.
+
+**Other cells**
+```{r}
+Lln = Linhom(subset(ln, marks == "other_cells"))
+Lln
+
+plot(Lln, lty = 1)
+
+pcfln = pcf(Kinhom(subset(ln, marks=="other_cells")))
+
+plot(pcfln, lty = 1)
+plot(pcfln, lty = 1, xlim = c(0,10))
+```

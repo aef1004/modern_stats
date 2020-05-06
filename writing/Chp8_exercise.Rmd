@@ -1,0 +1,132 @@
+---
+title: "Chp 8 Exercise"
+output: html_document
+---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(eval = TRUE, echo = TRUE, warning = FALSE, error = FALSE, message = FALSE)
+```
+
+### Exercise 8.1
+
+edgeR. Do the analyses of Section 8.5 with the edgeR package and compare the results: make a scatterplot of the 
+log 10 p-values, pick some genes where there are large differences, 
+and visualize the raw data to see what is going on. Based on this can you explain the differences?
+
+Most of the following code is taken straight come the book in section 8.5 for data cleaning/wrangling and DESeq2 analysis. The steps performed in edgeR are quite similar but we do see some differences that we will get to towards the end.
+
+First we load our libraries.
+```{r}
+library(pasilla)
+library(edgeR)
+library(dplyr)
+library(DESeq2)
+library(ggplot2)
+library(pheatmap)
+library(tidyverse)
+```
+We will use the same data used in the `DESeq2` examples from the section 8.5.
+
+Load the example data using the `system.file` call for R data stored as part of a R package. 
+Subsequent conversion to a matrix object.
+```{r}
+fn = system.file("extdata", "pasilla_gene_counts.tsv",
+                  package = "pasilla", mustWork = TRUE)
+counts = as.matrix(read.csv(fn, sep = "\t", row.names = "gene_id"))
+
+head(counts)
+```
+
+```{r, echo=FALSE}
+annotationFile = system.file("extdata",
+  "pasilla_sample_annotation.csv",
+  package = "pasilla", mustWork = TRUE)
+pasillaSampleAnno = readr::read_csv(annotationFile)
+
+pasillaSampleAnno = mutate(pasillaSampleAnno,
+condition = factor(condition, levels = c("untreated", "treated")),
+type = factor(sub("-.*", "", type), levels = c("single", "paired")))
+
+mt = match(colnames(counts), sub("fb$", "", pasillaSampleAnno$file))
+stopifnot(!any(is.na(mt)))
+
+pasilla = DESeqDataSetFromMatrix(
+  countData = counts,
+  colData   = pasillaSampleAnno[mt, ],
+  design    = ~ condition)
+
+pasilla = DESeq(pasilla)
+```
+
+### EdgeR
+
+Now begins the same analysis with the `edgeR` package. To do this we follow the vignette for the package that is a downloadable .pdf file that you can get in your Rstuio (`vignette("edgeR")`) or online https://www.bioconductor.org/packages/release/bioc/vignettes/edgeR/inst/doc/edgeRUsersGuide.pdf. 
+
+Here we make the `group` object consisting of the 8 samples, where 1 refers to the untreated group, and 2 refers to the treated group. With this `group` object we can make a `DGEList`, from the `edgeR` package, with our count data and the groups we just made. 
+```{r}
+group <- factor(c(1,1,1,1,2,2,2))
+x <- DGEList(counts=counts, group=group)
+```
+Calculate normalization factors to scale the raw library sizes.
+```{r}
+x <- calcNormFactors(x)
+x
+```
+```{r}
+design <- model.matrix(~group)
+design
+```
+The `estimateDisp` function "Maximizes the negative binomial likelihood to give the estimate of the common, trended and tagwise dispersions across all tags.
+Usage". We have to use this negative bionmial (aka gamma-Poisson) model since our experiments vary from replicate to replicate more than the traditional Poisson can account for. These varaiances can be due seemingly miniscule experimental conditions such as, temperatue of cell culture, pipettor calibration, etc. In the case of the gamma-Poisson we have two inputs for variance and mean instead of just having $\lambda$ for both variance and mean in the normal Poisson. 
+```{r}
+design_matrix <- estimateDisp(x, design)
+design_matrix
+```
+Now that we have our `design_matrix` we can begin fitting modified linear models to it. Here we use a quasi-likelihood negative binomial generalized log-linear model, which is a mouth full. "Quasi-likelihood estimation is one way of allowing for overdispersion, that is, greater variability in the data than would be expected from the statistical model used." Since we have already stated that we will have variation in our experiments due to the most minute factors this issue of overdisperision is apparent. Instead of using a traditional probility function, a variance function is used (variance as a function of the mean) and allows for an overdispersion parameter input which is used to to "fix" the variance function to resemble that of an exisiting probility function (ex.Poisson).
+```{r}
+fit <- glmQLFit(design_matrix, design)
+qlf <- glmQLFTest(fit, coef=2)
+edgeRoutput <- topTags(qlf)
+```
+Now we want to visualize the data points after their regression fits. We must tidy up the data sets a bit to apply some `Tidyverse` magic. 
+```{r}
+tidy_pasilla <- pasilla %>% 
+  results() %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "gene_id") %>% 
+  select(gene_id, pvalue, padj) %>% 
+  arrange(desc(padj))
+
+tidy_edgeR <- qlf %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "gene_id") %>%
+  select(gene_id, PValue)
+```
+Using `full_join` from `dplyr` package we are able to subset these two dataframes based on the `gene_id` column and keeping all matching columns. 
+```{r}
+full_join(tidy_pasilla, tidy_edgeR, 
+          "gene_id") %>% 
+  ggplot(aes(x = log10(pvalue), y = log10(PValue))) +
+  geom_point(alpha = 0.5) +
+  ggtitle("DESeq2 vs EdgeR", subtitle = "pvalues are from DESeq2, PValues are from edgeR") +
+  theme_bw()
+```
+  
+  From looking at the above graph we see that most of the data are falling on top of each other when pvalue > -25. We know this because the alpha of the `ggplot` object is set to 0.5, so if we see a dark black dot, it means there are two points there.
+
+So below we subset the data again, this time selecting those points with pvalue < -25 (log10 values). When plotting these we don't see any overlapping, showing that there are some variations between the `edgeR` and `DESeq2` packages. 
+```{r}
+full_join(tidy_pasilla, tidy_edgeR,"gene_id") %>% 
+  filter(log10(pvalue) <= -25) %>%
+  ggplot(aes(x = log10(pvalue), y = log10(PValue))) +
+  geom_point(alpha = 0.5) +
+  ggtitle("Genes with pvalue < -25") +
+  theme_bw()
+```
+
+### References
+* https://www.bioconductor.org/packages/release/bioc/vignettes/edgeR/inst/doc/edgeRUsersGuide.pdf
+* https://en.wikipedia.org/wiki/Quasi-likelihood
+* http://web.stanford.edu/class/bios221/book/Chap-CountData.html
+* https://rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf
+* https://geanders.github.io/RProgrammingForResearch/
