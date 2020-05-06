@@ -1,0 +1,94 @@
+---
+title: "Ch_12"
+author: "Amy Fox"
+date: "5/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("readr")
+library("magrittr")
+library(ggplot2)
+diabetes = read_csv("../data/diabetes.csv", col_names = TRUE)
+diabetes
+
+ggdb = ggplot(mapping = aes(x = insulin, y = glutest)) +
+  geom_point(aes(colour = group), data = diabetes)
+ggdb
+
+
+```
+
+
+
+```{r}
+
+library("MASS")
+library(tidyverse)
+diabetes_lda = lda(group ~ insulin + glutest, data = diabetes)
+diabetes_lda
+
+ghat = predict(diabetes_lda)$class
+table(ghat, diabetes$group)
+
+mean(ghat != diabetes$group)
+
+
+make1Dgrid = function(x) {
+  rg = grDevices::extendrange(x)
+  seq(from = rg[1], to = rg[2], length.out = 100)
+}
+
+diabetes_grid = with(diabetes,
+  expand.grid(insulin = make1Dgrid(insulin),
+              glutest = make1Dgrid(glutest)))
+
+diabetes_grid$ghat <- 
+  predict(diabetes_lda, newdata = diabetes_grid)$class
+
+centers = diabetes_lda$means
+
+
+
+
+
+
+
+unitcircle = exp(1i * seq(0, 2*pi, length.out = 90)) %>%
+          {cbind(Re(.), Im(.))}
+ellipse = unitcircle %*% solve(diabetes_lda$scaling)
+
+
+ellipses = lapply(seq_len(nrow(centers)), function(i) {
+  (ellipse +
+   matrix(centers[i, ], byrow = TRUE,
+          ncol = ncol(centers), nrow = nrow(ellipse))) %>%
+     cbind(group = i)
+}) %>% do.call(rbind, .) %>% data.frame
+
+ellipses$group %<>% factor
+
+# problem with geom_path
+ggdb + geom_raster(aes(fill = ghat),
+            data = diabetes_grid, alpha = 0.25, interpolate = TRUE) +
+    geom_point(data = as_tibble(centers), pch = "+", size = 8) +
+    geom_path(aes(colour = group), data = ellipses) +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0))
+```
+
+# 12.3.2 Predicting embryonic cell state
+
+```{r}
+library("Hiiragi2013")
+data("x")
+probes = c("1426642_at", "1418765_at", "1418864_at", "1416564_at")
+embryoCells = t(Biobase::exprs(x)[probes, ]) %>% as_tibble %>%
+  mutate(Embryonic.day = x$Embryonic.day) %>%
+  dplyr::filter(x$genotype == "WT")
+```
+
