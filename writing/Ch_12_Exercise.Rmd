@@ -1,0 +1,175 @@
+---
+title: "Ch_12_Exercise"
+author: "Amy Fox"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Exercise 12.2
+
+Use glmnet for a prediction of a continous variable, i.e., for regression. Use the prostate cancer data from Chapter 3 of (Hastie, Tibshirani, and Friedman 2008). The data are available in the CRAN package ElemStatLearn. Explore the effects of using ridge versus lasso penalty.
+
+Here are the packages that need to be installed.
+
+```{r}
+# install.packages("glmnet")
+library(glmnet)
+```
+
+## Data for the exercise
+
+The `ElemStatPackage` has been orphaned and isn't on CRAN anymore. However, it's up on
+GitHub, so I grabbed the data file you'll need from there. You can download it 
+yourself at: https://github.com/cran/ElemStatLearn/blob/master/data/prostate.RData
+
+```{r}
+load("../data/prostate.RData")
+
+prostate %>% 
+  head()
+```
+
+Here's a description of the data, from the archived help files: 
+
+> "Data to examine the correlation between the level of prostate-specific
+  antigen and a number of clinical measures in men who were about to 
+  receive a radical prostatectomy."
+
+Here's what the variables mean: 
+
+- `lcavol`: log cancer volume
+- `lweight`: log prostate weight
+- `age`: in years
+- `lbph`: log of the amount of benign prostatic hyperplasia
+- `svi`: seminal vesicle invasion
+- `lcp`: log of capsular penetration
+- `gleason`: a numeric vector with the Gleason score
+- `pgg45`: percent of Gleason score 4 or 5
+- `lpsa`: response (the thing you are trying to predict), the 
+level of prostate-specific antigen
+- `train`: a logical vector, of whether the data was to be 
+part of the training dataset (TRUE) or the testing one (FALSE)
+
+So, you're trying to predict the values of `lpsa` based on the variables
+`lcavol` through `pgg45`. 
+
+We will first split the data into testing and training data.
+```{r}
+prostate_train <- prostate %>%
+  filter(train == TRUE)
+
+prostate_test <- prostate %>%
+  filter(train == FALSE)
+
+nrow(prostate_train)
+nrow(prostate_test)
+
+```
+
+There are `r nrow(prostate_train)` samples in the training set and `r nrow(prostate_test)` samples in the testing set.
+
+## Perform Lasso and Ridge Penalty on the glmnet
+
+Here, we use a matrix of all of the predictors (`x`) to try to predict the `lpsa` column (`y`).
+
+Based on the glmnet package, when alpha = 1 (default) then it uses the lasso penalty, if alpha = 0, then ridge penalty is used. A great resource for the glmnet package can be found here: <https://web.stanford.edu/~hastie/glmnet/glmnet_alpha.html>
+
+```{r}
+# Lasso 
+mod_basic <- glmnet(x = prostate_train %>% dplyr::select(lcavol:pgg45) %>% as.matrix(), 
+                    y = prostate_train %>% pull(lpsa), 
+                    family = "gaussian", alpha = 1)
+
+plot(mod_basic, label = TRUE)
+
+# Ridge
+ridge_glmnet <- glmnet(x = prostate_train %>% dplyr::select(lcavol:pgg45) %>% as.matrix(), 
+                    y = prostate_train %>% pull(lpsa), 
+                    family = "gaussian", alpha = 0)
+
+plot(ridge_glmnet, label = TRUE)
+```
+
+## Cross Validation
+
+We then want to perform cross-validation on the dataset. We use the cv.glmnet function to do this. 
+
+```{r}
+set.seed(2)
+
+# Lasso
+cvglmnet_lasso <- cv.glmnet(x = prostate_train %>% dplyr::select(lcavol:pgg45) %>% as.matrix(), 
+                    y = prostate_train %>% pull(lpsa), 
+                    family = "gaussian", alpha = 0)
+cvglmnet_lasso
+
+plot(cvglmnet_lasso, main = "Lasso Cross Validation")
+
+# Ridge
+cvglmnet_ridge <- cv.glmnet(x = prostate_train %>% dplyr::select(lcavol:pgg45) %>% as.matrix(), 
+                    y = prostate_train %>% pull(lpsa), 
+                    family = "gaussian", alpha = 1)
+cvglmnet_ridge
+plot(cvglmnet_ridge, main = "Ridge Cross Validation")
+```
+-3 is at the minimum value - prediction error
+2nd dotted line - the largest red dot still within interval on the left (within 1 standard error of minimum) - the value they would suggest using - log(-.1)
+
+Compare the MSE's between the ridge and lasso 
+8 nonzero coefficients
+
+Ridge is more stringent? - so only 3 nonzero coefficients
+
+x - axis is showing how large the 
+
+Therefore, 1, 2, and 5 are good predictors
+
+
+## Lasso Prediction 
+```{r}
+s0 <- cvglmnet_lasso$lambda.1se 
+
+lasso_predict <- predict(cvglmnet_lasso, newx = prostate_test%>% dplyr::select(lcavol:pgg45) %>% as.matrix(), s = s0)
+
+prostate_test$lpsa
+
+cor(data.frame(lasso_predict, real = prostate_test$lpsa))
+# 72% correlated
+
+lm(data.frame(lasso_predict, real = prostate_test$lpsa)) %>%
+  summary()
+# adjusted r^2 value = 0.513
+
+data.frame(prediction = lasso_predict, real = prostate_test$lpsa) %>%
+  ggplot(aes(x = lasso_predict, y = real)) +
+  geom_point() +
+  geom_abline(slope=1, intercept=0)+
+  ggtitle("Lasso Prediction")
+  
+```
+
+## Ridge Prediction 
+```{r}
+s0 <- cvglmnet_ridge$lambda.1se 
+
+ridge_predict <- predict(cvglmnet_ridge, newx = prostate_test%>% dplyr::select(lcavol:pgg45) %>% as.matrix(), s = s0)
+
+prostate_test$lpsa
+
+cor(data.frame(ridge_predict, real = prostate_test$lpsa))
+# 77% correlated
+
+lm(data.frame(ridge_predict, real = prostate_test$lpsa)) %>%
+  summary()
+# adjusted r^2 value = 0.589
+
+data.frame(prediction = ridge_predict, real = prostate_test$lpsa) %>%
+  ggplot(aes(x = ridge_predict, y = real)) +
+  geom_point() +
+  geom_abline(slope=1, intercept=0) +
+  ggtitle("Ridge Prediction")
+  
+```
