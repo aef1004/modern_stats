@@ -1,0 +1,537 @@
+---
+title: "Chapter 12 Examples"
+author: "Brooke Anderson"
+date: "5/7/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r message = FALSE, warning = FALSE}
+library(tidyverse)
+```
+
+## Diabetes example
+
+```{r}
+diabetes <- read_csv("../data/diabetes.csv")
+
+diabetes %>% 
+  slice(1:3)
+
+diabetes %>% 
+  dim()
+```
+
+This dataset has observations on 144 people, all adults who were not obese.
+They've grouped these people into three groups (`group`): those who are "normal"
+(non-diabetic), those with chemical diabetes, and those with overt diabetes.
+Based on the paper they reference, for these subjects:
+
+> "The variables used were age, relative weight, fasting plasma glucose, area
+under the plasma glucose curve for the three hour oral glucose tolerance test,
+area under the plasma insulin curve for the OGTT, and the steady state plasma
+glucose response."
+
+Based on this, I ny guesses for the columns in the dataframe are: 
+
+- `id`: Patient unique identified
+- `relwt`: Relative weight
+- `glufast`: Fasting plasma glucose
+- `glutest`: Area under the plasma gluocse curve for the three hour oral 
+glucose tolerance test
+- `steady`: The steady-state plasma glucose response
+- `insulin`: Area under the plasma insulin curve for the OGTT
+- `group`: Which of the three groups the subject belonged to (normal, 
+chemical diabetes, or overt diabetes)
+
+One question here is how each of the measured variables is associated with
+the person's group status. Here's some code that does an adaptation of Figure 12.3
+in the book:
+
+```{r fig.height = 5, fig.width = 3, fig.align = "center"}
+diabetes <- diabetes %>% 
+  # Convert `group` to a factor and change the level names to be clearer
+  # (what they actually represent)
+  mutate(group = as_factor(group), 
+         group = fct_recode(group, 
+                            "Normal" = "1", 
+                            "Chemical diabetes" = "2", 
+                            "Overt diabetes" = "3"))
+# Find out how many subjects are in each group
+diabetes %>% 
+  group_by(group) %>% 
+  count()
+
+diabetes %>% 
+  # Reshape so we can plot everything with faceting
+  pivot_longer(relwt:insulin) %>% 
+  # Convert `name` (the new column created when you reshaped the data)
+  # to a factor and replace with what they really are (for better labels in 
+  # the graph)
+  mutate(name = as_factor(name), 
+         name = fct_recode(name, 
+                           "Relative weight" = "relwt", 
+                           "Fasting plasma glucose" = "glufast", 
+                           "Plasma glucose under tolerance test" = "glutest", 
+                           "Steady-state glusose response" = "steady", 
+                           "Plasma insulin under tolerance test" = "insulin")) %>% 
+  ggplot(aes(x = value, color = group)) + 
+  geom_density() + 
+  facet_wrap(~ name, scales = "free", ncol = 1) + 
+  theme(legend.position = "bottom")
+```
+
+For this example dataset, I think we'll be trying to see if we can build a model
+to predict a person's group status (normal, chemical diabetes, or overt diabetes) 
+based on these measurements. 
+
+They start by trying to predict `group` based on two measurements, `insulin` and `glutest`. 
+Here's a scatterplot of those variables, with group status shown by color: 
+
+```{r message = FALSE, warning = FALSE, fig.height = 3.5, fig.width = 5.5, fig.align = "center"}
+# Calculate the means of each variable by group
+# We'll add these as "X"s to show the group mean in the plot
+group_means <- diabetes %>% 
+  group_by(group) %>% 
+  summarize_all(mean) 
+group_means
+
+# Since we're plotting from two dataframes, wait and add the "data" 
+# when you add each geom.
+ggplot() + 
+  geom_point(data = diabetes, 
+             aes(x = insulin, y = glutest, color = group)) + 
+  geom_point(data = group_means, 
+             aes(x = insulin, y = glutest), 
+             shape = 4, size = 5) + 
+  labs(x = "Plasma insulin under tolerance test", 
+       y = "Plasma glucose under tolerance test", 
+       color = "")
+```
+
+Try using LDA to build a predictive model based on these two measurements in the
+data. Fit the model using `lda`:
+
+```{r message = FALSE, warning = FALSE}
+library(MASS)
+diabetes_lda <- lda(group ~ insulin +  glutest, data = diabetes)
+```
+
+This has a special class, `lda`. Often, the output from fitting models in R have
+special S4 (or S3) classes, which are essentially fancy lists.
+
+```{r}
+diabetes_lda %>% 
+  class()
+```
+
+These will often have interesting `print` methods, which will show
+some results from fitting the model: 
+
+```{r}
+# The `print` method runs by default when you run just the object's name
+diabetes_lda
+```
+
+As with any object in the "list" family, you might be able to find out what's in the
+object using `names` and `str`:
+
+```{r}
+diabetes_lda %>% 
+  names()
+
+diabetes_lda %>% 
+  str()
+```
+
+You can use this model object to predict new class levels. You can do this by 
+either for the original data or with new data that includes columns with `insulin` and
+`glutest`. For example, here's a case of using this model to predict the subjects'
+groups from the original data (of course, we know what the real values are!) based
+on each subject's measures of `insulin` and `glutest` and on this model we just built.
+By default, it predicts on the data used to fit the model, so we don't need to input that:
+
+```{r}
+diabetes_lda %>% 
+  predict() %>% 
+  # The` predict` object includes several elements. Right now, we just want to get the
+  # classes
+  pluck("class")
+```
+
+We will often want to compare that to the *true* classes for each study subject. 
+Here's one way of doing that: 
+
+```{r}
+diabetes_lda %>% 
+  predict() %>% 
+  pluck("class") %>% 
+  as_tibble() %>% 
+  rename(predicted_group = value) %>% 
+  # Add on a column with the real group labels (by default, the predictions will
+  # be in the same order as the original data, so things should line up fine here)
+  mutate(true_group = diabetes$group) %>% 
+  # Get the numbers in each combo of true and predicted group labels
+  group_by(predicted_group, true_group) %>% 
+  count() %>% 
+  # Make a plot to compare the true and predicted groups
+  ggplot(aes(x = predicted_group, y = true_group, fill = n, label = n)) + 
+  geom_tile() + 
+  geom_text(color = "white") +
+  labs(x = "Predicted group\n(based on LDA model)", 
+       y = "Real group", 
+       fill = "# of study\nsubjects") + 
+  theme_classic()
+```
+ 
+To help visualize the predictions, they suggest that we make a regularly-spaced grid
+all across the range of the original data (so it will fill up the background of 
+the original scatterplot). Then, we'll use the LDA model to predict the class at each
+of these grid points. This will let us see what the model would predict at each 
+area of the original range of data. 
+
+There's a wonderful function called `expand_grid` that lets you create a dataframe
+with every possible combination of two or more sets of vectors. We can use that
+to create a grid across the original plot area (we can use `min` and `max` on each variable
+to figure out what that is).
+ 
+```{r}
+# Create a new dataframe with points to predict at. They'll be regularly-spaced
+# points throughout the space of the original data
+pred_grid <- expand_grid(insulin = seq(from = min(diabetes$insulin), 
+                          to = max(diabetes$insulin), 
+                          length.out = 100), 
+            glutest = seq(from = min(diabetes$glutest), 
+                          to = max(diabetes$glutest), 
+                          length.out = 100))
+
+pred_grid %>% 
+  slice(1:5)
+
+# This is just to show you that you do indeed get a regularly-spaced grid throughout
+# the original graph area
+ggplot(pred_grid, aes(x = insulin, y = glutest)) + 
+  geom_point(size = 0.1)
+```
+ 
+Now we want to add on our predictions for each of these grid points, based on the LDA
+model we built: 
+
+```{r}
+diabetes_lda %>% 
+  # Predict the groups for each point in the expanded grid
+  predict(newdata = pred_grid) %>% 
+  pluck("class") %>% 
+  as_tibble() %>% 
+  # Add back in the values of `insulin` and `glutest` so we can plot
+  # everything together
+  mutate(insulin = pred_grid$insulin, 
+         glutest = pred_grid$glutest) %>% 
+  # Plot everything
+  ggplot(aes(x = insulin, y = glutest, color = value)) + 
+  geom_point(size = 0.1)
+```
+
+Now you can add back in the original data:
+
+```{r}
+diabetes_lda %>% 
+  # Predict the groups for each point in the expanded grid
+  predict(newdata = pred_grid) %>% 
+  pluck("class") %>% 
+  as_tibble() %>% 
+  # Add back in the values of `insulin` and `glutest` so we can plot
+  # everything together
+  mutate(insulin = pred_grid$insulin, 
+         glutest = pred_grid$glutest) %>% 
+  # Plot the predictions for all the regions of the plot, based on the LDA model
+  ggplot(aes(x = insulin, y = glutest, color = value)) + 
+  geom_point(size = 1, alpha = 0.2) + 
+  # Add in the observed data points
+  geom_point(data = diabetes, 
+             aes(x = insulin, y = glutest, color = group)) + 
+  # Plot the points showing mean values of insulin and glutest for each group
+  geom_point(data = group_means, 
+             aes(x = insulin, y = glutest, color = NULL), 
+             shape = 3, size = 5)
+```
+
+They discuss how this model is more likely, for observations between the group
+means for `insulin` and `glutest` for groups 2 and 3, to predict 3 (overt diabetes)
+rather than 2 (chemical diabetes). This is because the original data has a much 
+higher proportion of observations in group 3 than group 2, which leads to the 
+default prior weights for the LDA being skewed toward group 2. 
+
+```{r}
+# Calculate the total number of observations in each group, as well as
+# the proportion of all observations in each group
+diabetes %>% 
+  group_by(group) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(total = sum(n), 
+         prop = n / total)
+
+# Compare to the priors in the LDA model---you'll see they're just using 
+# the proportion of observations in the group in the data used to train the
+# model
+diabetes_lda %>% 
+  pluck("prior")
+```
+
+You can change re-fit an LDA model while forcing the prior weights for each 
+group to be equal by adding weights for each observation. In essence, the aim is to 
+"downweight" the class where we had more observations (overt obesity) and "upweight"
+the other so that the priors are even between the three groups:
+
+```{r}
+diabetes_up <- lda(group ~ insulin + glutest, data = diabetes, 
+                   prior = c(1/3, 1/3, 1/3))
+diabetes_up
+```
+
+Create a plot with the predicted regions based on this new model, with a uniform prior:
+
+```{r}
+diabetes_up %>% 
+  # Predict the groups for each point in the expanded grid
+  predict(newdata = pred_grid) %>% 
+  pluck("class") %>% 
+  as_tibble() %>% 
+  # Add back in the values of `insulin` and `glutest` so we can plot
+  # everything together
+  mutate(insulin = pred_grid$insulin, 
+         glutest = pred_grid$glutest) %>% 
+  # Plot the predictions for all the regions of the plot, based on the LDA model
+  ggplot(aes(x = insulin, y = glutest, color = value)) + 
+  geom_point(size = 1, alpha = 0.2) + 
+  # Add in the observed data points
+  geom_point(data = diabetes, 
+             aes(x = insulin, y = glutest, color = group)) + 
+  # Plot the points showing mean values of insulin and glutest for each group
+  geom_point(data = group_means, 
+             aes(x = insulin, y = glutest, color = NULL), 
+             shape = 3, size = 5)
+```
+
+You might want to compare how well several models perform. One measure might be
+the accuracy of each model in classifying the data---what percent of the observations
+does the model assign the correct class? Here, we'll check that in the original 
+data used to fit the model, but just note that that method of checking models can 
+be prone to reward models that overfit to the training data. 
+
+```{r}
+# Fit your three models and put the results of each in the three slots in a list
+list(two_var_unweighted = lda(group ~ insulin + glutest,
+                                            data = diabetes),
+     two_var_weighted = lda(group ~ insulin + glutest, 
+                            data = diabetes,
+                            prior = c(1/3, 1/3, 1/3)), 
+     five_var_unweighted = lda(group ~ relwt + glufast + glutest + 
+                                 steady + insulin, data = diabetes)
+     ) %>% 
+  # Use `map` to run `predict` for each of the model objects
+  map(predict) %>% 
+  # Pluck out the first element of the output of predict for each (the class predictions)
+  map(1) %>% 
+  # Convert this from a vector to a one-column dataframe
+  map(as_tibble) %>% 
+  # Add in a column with the true values of each observation (from the original data)
+  map(~ mutate(., true_class = diabetes$group)) %>% 
+  # Stick everything together into one big data frame
+  bind_rows(.id = "model") %>% 
+  # Check for when the prediction is right (i.e., the same as the true group
+  # based on the original data)
+  mutate(right = value == true_class) %>% 
+  # Get summaries of what percent of the time the prediction is right for each 
+  # model (and what percent of the time it's wrong, since that's what they 
+  # calculated in the book)
+  group_by(model) %>% 
+  summarize(perc_right = round(100 * mean(right), 1), 
+            perc_wrong = round(100 * mean(!right), 1)) %>% 
+  mutate(model = fct_recode(model, 
+                            "Unweighted, all 5 variables" = "five_var_unweighted", 
+                            "Unweighted, insulin and glucose test" = "two_var_unweighted", 
+                            "Weighted, insulin and glucose test" = "two_var_weighted")) %>% 
+  knitr::kable(col.names = c("Model", 
+                             "Percent predicted correctly", 
+                             "Percent predicted incorrectly"))
+```
+
+## Embryonic cell state example
+
+They give another example, where they have some gene expression data from measurements
+made at several different embryonic days, and they want to see if they can build a 
+model that uses expression levels for four of these genes to predict the development
+stage (embryonic day). 
+
+Load the data:
+
+```{r}
+library("Hiiragi2013")
+data("x")
+
+x %>% 
+  class()
+```
+
+This data is in an `ExpressionSet` class. You can extract the expression levels
+with the `exprs` accessor method: 
+
+```{r}
+embryonicDay <- x %>% 
+  # Extract expression levels
+  exprs() %>% 
+  # Transpose, so that samples are on rows and gene expression levels
+  # in columns
+  t() %>% 
+  # Put the rownames in a column, because we want to keep that info (it
+  # helps identify each sample). You can do this while you convert to 
+  # a tibble.
+  as_tibble(rownames = "sample_id") %>% 
+  # Keep just the measurements for the four genes that you care about
+  dplyr::select(sample_id, `1426642_at`, `1418765_at`, `1418864_at`, `1416564_at`) %>% 
+  # Use regular expressions to pull out the embryonic day from the sample IDs
+  mutate(embry_day = str_extract(sample_id, "E.+"),
+         embry_day = str_remove(embry_day, "\\(.+"),
+         embry_day = str_squish(embry_day),
+         embry_day = as_factor(embry_day))
+
+embryonicDay %>% 
+  dplyr::slice(1:3)
+  
+```
+
+At this point, we have a much smaller dataframe, with data for each sample giving
+the sample ID, the expression levels of four genes, and the embryonic day. We're going
+to try to build a model that predicts embryonic day (`embry_day`) based on the four
+gene expression levels.
+
+However, it sounds like we also want to use the probe IDs for these genes to get
+symbols and gene names for each of them. To do that, it sounds like we can first use
+the `annotation` function to figure out what annotation package to use for this data:
+
+```{r}
+x %>% 
+  annotation()
+```
+
+Once we know that, we can load the right package and then get the annotation dataset:
+
+```{r message = FALSE, warning = FALSE}
+library("mouse4302.db")
+probe_annos <- mouse4302.db %>% 
+  AnnotationDbi::select(keys = embryonicDay %>% colnames() %>% str_subset("^[0-9]"),
+                        columns = c("SYMBOL", "GENENAME"))
+
+probe_annos
+```
+
+Now we can merge this in with out original data to get some better column names: 
+
+```{r}
+embryonicDay %<>%
+  # Lengthen the data so we can join with the better symbols and replace these
+  # as the column names, then we'll pivot back out to this shape
+  pivot_longer(-c(sample_id, embry_day)) %>% 
+  full_join(probe_annos %>% dplyr::select(PROBEID, SYMBOL), 
+            by = c("name" = "PROBEID")) %>% 
+  dplyr::select(-name) %>% 
+  pivot_wider(names_from = SYMBOL, values_from = value)
+
+# Yah, better column names!
+embryonicDay %>% 
+  dplyr::slice(1:3)
+```
+
+Investigate associations between these four gene expression levels and the 
+embryonic day:
+
+```{r message = FALSE, warning = FALSE}
+library(GGally)
+
+embryonicDay %>% 
+  ggpairs(aes(color = embry_day),
+          # Only show for the four gene expression columns
+          columns = 3:6,
+          upper = list(continuous = "points"))
+
+```
+
+Fit an LDA predictive model: 
+
+```{r}
+ec_lda <- lda(embry_day ~ Fn1 + Timd2 + Gata4 + Sox7, 
+              data = embryonicDay)
+ec_lda
+```
+
+Check the linear combinations LD1 and LD2 that serve as discriminating variables:
+
+```{r}
+ec_lda %>% 
+  pluck("scaling") %>% 
+  round(1)
+```
+
+
+## Data for the exercise
+
+The `ElemStatPackage` has been orphaned and isn't on CRAN anymore. However, it's up on
+GitHub, so I grabbed the data file you'll need from there. You can download it 
+yourself at: https://github.com/cran/ElemStatLearn/blob/master/data/prostate.RData
+
+```{r}
+load("../data/prostate.RData")
+
+prostate %>% 
+  head()
+```
+
+Here's a description of the data, from the archived help files: 
+
+> "Data to examine the correlation between the level of prostate-specific
+  antigen and a number of clinical measures in men who were about to 
+  receive a radical prostatectomy."
+
+Here's what the variables mean: 
+
+- `lcavol`: log cancer volume
+- `lweight`: log prostate weight
+- `age`: in years
+- `lbph`: log of the amount of benign prostatic hyperplasia
+- `svi`: seminal vesicle invasion
+- `lcp`: log of capsular penetration
+- `gleason`: a numeric vector with the Gleason score
+- `pgg45`: percent of Gleason score 4 or 5
+- `lpsa`: response (the thing you are trying to predict), the 
+level of prostate-specific antigen
+- `train`: a logical vector, of whether the data was to be 
+part of the training dataset (TRUE) or the testing one (FALSE)
+
+So, you're trying to predict the values of `lpsa` based on the variables
+`lcavol` through `pgg45`. 
+
+In this exercise, they ask you to use the `glmnet` package:
+
+```{r}
+# install.packages("glmnet")
+library(glmnet)
+```
+
+For `glmnet`, I think you need to input a matrix of the predictors (`x`) and, in the 
+same order, a vector with the outcomes (`y`). So, here's an example of building a 
+model to predict `lpsa` from `prostate` based on all the variables between `lcavol` and
+`pgg45`:
+
+```{r}
+mod_basic <- glmnet(x = prostate %>% dplyr::select(lcavol:pgg45) %>% as.matrix(), 
+                    y = prostate %>% pull(lpsa), 
+                    family = "gaussian")
+
+mod_basic 
+```
+
