@@ -1,21 +1,39 @@
 ---
 title: "Exercise Solution for Chapter 12"
 author: "Amy Fox"
-output: html_document
+date: '2020-05-12'
+slug: exercise-solution-for-chapter-12
+draft: yes
+categories:
+  - Exercise solutions
+  - Chapter 12
+tags:
+  - Exercise solutions
+  - Chapter 12
+subtitle: ''
+summary: ''
+authors: [amy-fox]
+lastmod:
+featured: no
+image:
+  caption: ''
+  focal_point: ''
+  preview_only: no
+projects: []
+
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Exercise 12.2 from Modern Statistics for Modern Biologists
+## Exercise 12.2 from Modern Statistics for Modern Biologists
 
 Use glmnet for a prediction of a continous variable, i.e., for regression. Use the prostate cancer data from Chapter 3 of (Hastie, Tibshirani, and Friedman 2008). The data are available in the CRAN package ElemStatLearn. Explore the effects of using ridge versus lasso penalty.
 
 
 Here are the packages that need to be installed.
 ```{r message = FALSE}
-# install.packages("glmnet")
 library(dplyr)
 library(glmnet)
 library(ggplot2)
@@ -65,19 +83,15 @@ prostate_train <- prostate %>%
 
 prostate_test <- prostate %>%
   filter(train == FALSE)
-
-nrow(prostate_train)
-nrow(prostate_test)
-
 ```
 
 There are `r nrow(prostate_train)` samples in the training set and `r nrow(prostate_test)` samples in the testing set.
 
 ## Fit generaltized linear model (glmnet) with Lasso and Ridge penalties
 
-Here, we use a matrix of all of the predictors (`x`) to try to predict the `lpsa` column (`y`).
-
 Based on the glmnet package, when alpha = 1 the lasso penalty is used, if alpha = 0, then ridge penalty is used. A great resource for the glmnet package can be found here: <https://web.stanford.edu/~hastie/glmnet/glmnet_alpha.html>
+
+Here, we use a matrix of all of the predictors (`x`) to try to predict the `lpsa` column (`y`).
 
 ```{r}
 # Lasso 
@@ -85,7 +99,7 @@ lasso_glmnet <- glmnet(x = prostate_train %>% dplyr::select(lcavol:pgg45) %>% as
                     y = prostate_train %>% pull(lpsa), 
                     family = "gaussian", alpha = 1)
 
-plot(lasso_glment, label = TRUE)
+plot(lasso_glmnet, label = TRUE)
 title("Lasso Penalty", line = -2.5)
 
 # Ridge
@@ -97,12 +111,12 @@ plot(ridge_glmnet, label = TRUE)
 title("Ridge Penalty", line = -1.5)
 ```
 
-In the plots show the coefficients as L1- norm increases. The top axis shows the number of nonzero coefficients correspoding to the lamba at the current L1 norm. From these plots we can see that predictors 1, 2, and 5 are good predictors for the lpsa response.
+In the plots show the coefficients as L1- norm increases. The top axis shows the number of nonzero coefficients correspoding to the lamba at the current L1 norm. From these plots we can see that the variables 1 (log cancer volume [lcavol]), 2 (log prostate weight [lweight]), and 5 (seminal vesicle invasion [svi]) are good predictors for the level of prostate-specific antigen (lpsa response).
 
 
 ## Cross Validation
 
-We then want to perform cross-validation on the dataset. We use the cv.glmnet function to do this. 
+We then want to perform cross-validation on the dataset. We use the cv.glmnet function to do this. Again we input a matrix of all of the predictors (`x`) to look at the lpsa response (`y`). 
 
 ```{r}
 set.seed(2)
@@ -125,12 +139,11 @@ cvglmnet_ridge
 plot(cvglmnet_ridge)
 title("Ridge Cross Validation", line = -1.5)
 ```
-Min: minimum lambda 
-1se: within 1 standard error of the minimum lambda - this is the value that the model suggests that we use (2nd dotted line on the plot).
 
+In the data output, `1se` means the data point what is within 2 standard error of the minimum lambda (`min`). This it the value that the model suggests that we use (indicated by the 2nd dotted line on the plots.)
 The `1se Measure`  is similar to the mean squared error. If the measure is small, then the model is better. When comparing the `Measure` of the `1se` between the two penalties, we can see that the Ridge Penalty has a smaller 1se Measure, showing that it performs better. 
 
-The Nonzero column describes the nonzero coefficients, or the number of predictors that are important in the particular model. There were a total of 8 predictors as the input. The Lasso penalty shows that all 8 predicotrs are important in building the model, but the Ridge penalty only uses 5 predictors.
+The Nonzero column describes the nonzero coefficients, or the number of predictors that are important in the particular model. There were a total of 8 predictors as the input. The Lasso penalty shows that all 8 predictors are important in building the model, but the Ridge penalty only uses 5 predictors.
 
 ## Lasso Prediction 
 
@@ -147,22 +160,22 @@ actual_lasso_predict_df <- data.frame(prediction = as.vector(lasso_predict), act
 
 ```
 
-We can then see how correlated the prediction and real data are.
+We can then see how correlated the prediction and real data are using the `cor` function.
 ```{r}
 # look at the correlation of the prediction and real data
 cor(actual_lasso_predict_df)
 ```
-They are 72% correlated.
+The output shows that the actual and predicted values are 72% correlated.
 
-We can then fit a linear line to the prediction and actual data and look at the r^2 value
+We can then fit a linear line to the prediction and actual data and look at the r^2^ value.
 ```{r}
 lm(actual_lasso_predict_df) %>%
   summary()
 ```
 
-The adjusted r^2 value = 0.513
+The adjusted r^2^ value = 0.513.
 
-Finally, we can plot the actual vs. predicted values on a scatter plot. If the actual and predicted values matched up exactly, they would sit on the y = x line.
+Finally, we can plot the actual vs. predicted values on a scatter plot. If the actual and predicted values match up exactly, they would sit on the y = x line.
 ```{r}
 ggplot(actual_lasso_predict_df, aes(x = actual, y = prediction)) +
   geom_point(color = "#00B0F6", size = 2) +
@@ -181,23 +194,22 @@ s0 <- cvglmnet_ridge$lambda.1se
 
 ridge_predict <- predict(cvglmnet_ridge, newx = prostate_test%>% dplyr::select(lcavol:pgg45) %>% as.matrix(), s = s0)
 
-prostate_test$lpsa
-
+# create a data frame of the predicted values and actual values
 actual_ridge_predict_df <- data.frame(prediction = as.vector(ridge_predict), actual = prostate_test$lpsa) 
 ```
 
-We can then see how correlated the prediction and real data are.
+We can then see how correlated the prediction and real data are using the `cor` function again.
 ```{r}
 cor(actual_ridge_predict_df)
 ```
 The ridge prediction and acutal values are 77% correlated.
 
-We can then fit a linear line to the prediction and actual data and look at the r^2 value
+We can then fit a linear line to the prediction and actual data and look at the r^2^ value
 ```{r}
 lm(actual_ridge_predict_df) %>%
   summary()
 ```
-The adjusted r^2 value = 0.589
+The adjusted r^2^ value = 0.589
 
 Finally, we can plot the actual vs. predicted values on a scatter plot. If the actual and predicted values matched up exactly, they would sit on the y = x line.
 ```{r}
@@ -210,4 +222,4 @@ ggplot(actual_ridge_predict_df, aes(x = actual, y = prediction)) +
 
 ## Conclusion
 
-Comparing the Lasso and Ridge Penalty, based on the cross-validation, the ridge penalty had a smaller 1se Measure, showing that it performs better. When looking at the actual predictions on the testing data, the ridge penalty had a higher correlation between the predicted and acutal values (77%) compared to the lasso penatly correlation (72%). Further, when fitting a linear model to the actual and predicted values, the r^2 values were highter for the ridge penalty (0.589) versus the lasso penalty (0.513). In conclusion, the ridge penalty performed better on this particular data set.
+Comparing the Lasso and Ridge Penalty, based on the cross-validation, the ridge penalty had a smaller 1se Measure, showing that it performs better. When looking at the actual predictions on the testing data, the ridge penalty had a higher correlation between the predicted and acutal values (77%) compared to the lasso penatly correlation (72%). Further, when fitting a linear model to the actual and predicted values, the r^2^ values were highter for the ridge penalty (0.589) versus the lasso penalty (0.513). In conclusion, the **ridge penalty performed better on this particular data set.**
